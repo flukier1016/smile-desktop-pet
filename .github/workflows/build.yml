@@ -12,7 +12,7 @@ jobs:
   macos-universal:
     runs-on: macos-14
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Build universal app
         run: ./build.sh
       - name: Verify bundle
