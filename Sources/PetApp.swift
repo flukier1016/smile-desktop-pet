@@ -46,25 +46,15 @@ final class PetController: NSObject {
     private var idleTimer: Timer?
     private var quietUntil: Date?
     private var clickThrough = false
-
-    private let idlePhrases = [
-        "你工作，我负责可爱。",
-        "我在监督你喝水 👀",
-        "摸鱼五分钟，批准！",
-        "叮！快乐余额 +1",
-        "桌面这么大，都是我的地盘。",
-        "发呆中…其实在缓存灵感。",
-        "再忙也要伸个懒腰呀～",
-        "今天也要笑得很大声！",
-        "要不要一起去吃点好的？",
-        "别皱眉，送你一个笑脸！",
-        "刚刚那行代码，是你写的吗？",
-        "我没有偷懒，我在待机。"
-    ]
+    private var awarenessEngine: AwarenessEngine!
+    private var currentScene: PetScene = .companion
+    private var lastAwarenessSnapshot: AwarenessSnapshot?
 
     func start() {
+        awarenessEngine = AwarenessEngine()
         makePanel()
         makeStatusItem()
+        configureAwareness()
         restorePosition()
         panel.orderFrontRegardless()
         petView.showMessage("嗨！戳戳我，或者右键看看～", duration: 5)
@@ -87,6 +77,8 @@ final class PetController: NSObject {
             name: NSApplication.didChangeScreenParametersNotification,
             object: nil
         )
+
+        awarenessEngine.start()
     }
 
     private func makePanel() {
@@ -138,6 +130,7 @@ final class PetController: NSObject {
         addMenuItem("👋 叫她回来", action: #selector(bringBack), to: menu)
         addMenuItem("💬 让她说句话", action: #selector(saySomething), to: menu)
         addSizeSubmenu(to: menu)
+        addAwarenessSubmenu(to: menu)
         menu.addItem(.separator())
 
         let passItem = NSMenuItem(
@@ -176,6 +169,7 @@ final class PetController: NSObject {
         addMenuItem("🔮 今日小运气", action: #selector(fortune), to: menu)
         addMenuItem("🐾 出去散个步", action: #selector(takeAWalk), to: menu)
         addSizeSubmenu(to: menu)
+        addAwarenessSubmenu(to: menu)
         menu.addItem(.separator())
         addMenuItem("🫣 躲 5 分钟", action: #selector(hideForFiveMinutes), to: menu)
         addMenuItem("退出", action: #selector(quit), to: menu)
@@ -205,6 +199,122 @@ final class PetController: NSObject {
         sizeMenu.addItem(hint)
         sizeItem.submenu = sizeMenu
         menu.addItem(sizeItem)
+    }
+
+    private func addAwarenessSubmenu(to menu: NSMenu) {
+        let awarenessItem = NSMenuItem(title: "🧠 场景感知", action: nil, keyEquivalent: "")
+        let awarenessMenu = NSMenu()
+
+        let enabledItem = NSMenuItem(
+            title: "自动感知",
+            action: #selector(toggleAwareness(_:)),
+            keyEquivalent: ""
+        )
+        enabledItem.target = self
+        enabledItem.tag = 301
+        enabledItem.state = awarenessEngine.isEnabled ? .on : .off
+        awarenessMenu.addItem(enabledItem)
+
+        let ocrItem = NSMenuItem(
+            title: "本地屏幕 OCR",
+            action: #selector(toggleScreenOCR(_:)),
+            keyEquivalent: ""
+        )
+        ocrItem.target = self
+        ocrItem.tag = 302
+        ocrItem.state = awarenessEngine.isOCREnabled ? .on : .off
+        ocrItem.isEnabled = awarenessEngine.isEnabled
+        awarenessMenu.addItem(ocrItem)
+
+        let currentItem = NSMenuItem(
+            title: "当前：\(currentScene.emoji) \(currentScene.title)",
+            action: nil,
+            keyEquivalent: ""
+        )
+        currentItem.tag = 305
+        currentItem.isEnabled = false
+        awarenessMenu.addItem(currentItem)
+
+        let sourceItem = NSMenuItem(
+            title: awarenessSourceMenuTitle(),
+            action: nil,
+            keyEquivalent: ""
+        )
+        sourceItem.tag = 306
+        sourceItem.isEnabled = false
+        awarenessMenu.addItem(sourceItem)
+
+        awarenessMenu.addItem(.separator())
+        addMenuItem("🔎 立即识别一次", action: #selector(refreshAwareness), to: awarenessMenu)
+
+        let pauseTitle = awarenessEngine.isPaused || awarenessEngine.selectedManualScene != nil
+            ? "▶️ 恢复自动切换"
+            : "⏸ 暂停感知 30 分钟"
+        let pauseItem = NSMenuItem(
+            title: pauseTitle,
+            action: #selector(toggleAwarenessPause),
+            keyEquivalent: ""
+        )
+        pauseItem.target = self
+        pauseItem.tag = 303
+        pauseItem.isEnabled = awarenessEngine.isEnabled
+        awarenessMenu.addItem(pauseItem)
+
+        addOCRIntervalSubmenu(to: awarenessMenu)
+        addManualSceneSubmenu(to: awarenessMenu)
+
+        awarenessMenu.addItem(.separator())
+        addMenuItem("🔒 隐私与屏幕权限…", action: #selector(showAwarenessPrivacy), to: awarenessMenu)
+
+        awarenessItem.submenu = awarenessMenu
+        menu.addItem(awarenessItem)
+    }
+
+    private func addOCRIntervalSubmenu(to menu: NSMenu) {
+        let intervalItem = NSMenuItem(title: "⏱ OCR 识别间隔", action: nil, keyEquivalent: "")
+        let intervalMenu = NSMenu()
+        let options: [(String, Selector, Int, TimeInterval)] = [
+            ("灵敏 · 8 秒", #selector(setOCRIntervalFast), 311, 8),
+            ("均衡 · 15 秒", #selector(setOCRIntervalBalanced), 312, 15),
+            ("省电 · 30 秒", #selector(setOCRIntervalGentle), 313, 30)
+        ]
+        for option in options {
+            let item = NSMenuItem(title: option.0, action: option.1, keyEquivalent: "")
+            item.target = self
+            item.tag = option.2
+            item.state = abs(awarenessEngine.ocrInterval - option.3) < 0.5 ? .on : .off
+            intervalMenu.addItem(item)
+        }
+        intervalItem.submenu = intervalMenu
+        menu.addItem(intervalItem)
+    }
+
+    private func addManualSceneSubmenu(to menu: NSMenu) {
+        let previewItem = NSMenuItem(title: "🎭 手动预览状态", action: nil, keyEquivalent: "")
+        let previewMenu = NSMenu()
+        addSceneGroup("工作现场", scenes: PetScene.workScenes, to: previewMenu)
+        addSceneGroup("沟通与创作", scenes: PetScene.communicationScenes, to: previewMenu)
+        addSceneGroup("生活与摸鱼", scenes: PetScene.lifeScenes, to: previewMenu)
+        previewItem.submenu = previewMenu
+        menu.addItem(previewItem)
+    }
+
+    private func addSceneGroup(_ title: String, scenes: [PetScene], to menu: NSMenu) {
+        let groupItem = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+        let groupMenu = NSMenu()
+        for scene in scenes {
+            let item = NSMenuItem(
+                title: "\(scene.emoji) \(scene.title)",
+                action: #selector(previewScene(_:)),
+                keyEquivalent: ""
+            )
+            item.target = self
+            item.representedObject = scene.rawValue
+            item.state = awarenessEngine.selectedManualScene == scene ? .on : .off
+            groupMenu.addItem(item)
+        }
+        groupItem.submenu = groupMenu
+        menu.addItem(groupItem)
     }
 
     func tapped(at point: NSPoint) {
@@ -291,6 +401,168 @@ final class PetController: NSObject {
         )
     }
 
+    private func configureAwareness() {
+        awarenessEngine.onSnapshot = { [weak self] snapshot, _ in
+            self?.lastAwarenessSnapshot = snapshot
+            self?.updateMenuStates()
+        }
+        awarenessEngine.onSceneChange = { [weak self] scene, snapshot in
+            self?.applyScene(scene, snapshot: snapshot)
+        }
+    }
+
+    private func applyScene(_ scene: PetScene, snapshot: AwarenessSnapshot?) {
+        guard currentScene != scene else { return }
+        currentScene = scene
+        petView.setScene(scene)
+        statusItem.button?.toolTip = "\(appName) · \(scene.title)"
+        updateMenuStates()
+
+        guard quietUntil == nil || Date() >= quietUntil! else { return }
+        panel.orderFrontRegardless()
+        petView.showMessage(scene.arrivalPhrases.randomElement()!, duration: 4.5)
+        switch scene.motion {
+        case .panic:
+            petView.wiggle()
+            petView.celebrate(symbols: ["!", "⚠︎", "×"], count: 10)
+        case .celebrate:
+            petView.party()
+        case .dance:
+            petView.wiggle()
+        case .busy:
+            petView.bounce()
+        default:
+            break
+        }
+    }
+
+    private func awarenessSourceMenuTitle() -> String {
+        guard awarenessEngine != nil else { return "来源：尚未识别" }
+        if awarenessEngine.isOCREnabled && !awarenessEngine.hasScreenCapturePermission {
+            return "来源：OCR 等待屏幕权限"
+        }
+        guard let snapshot = lastAwarenessSnapshot else {
+            return awarenessEngine.isOCREnabled ? "来源：等待本地 OCR" : "来源：前台 App"
+        }
+        let app = snapshot.appName.isEmpty ? "桌面" : snapshot.appName
+        return "来源：\(snapshot.sourceLabel) · \(app)"
+    }
+
+    @objc private func toggleAwareness(_ sender: NSMenuItem) {
+        let enabled = !awarenessEngine.isEnabled
+        awarenessEngine.setEnabled(enabled)
+        if enabled {
+            petView.showMessage("自动感知启动，我会看场景变状态～", duration: 4)
+        } else {
+            currentScene = .companion
+            petView.setScene(.companion)
+            petView.showMessage("自动感知已关闭，我只负责陪你。", duration: 4)
+        }
+        updateMenuStates()
+    }
+
+    @objc private func toggleScreenOCR(_ sender: NSMenuItem) {
+        if awarenessEngine.isOCREnabled {
+            awarenessEngine.setOCREnabled(false)
+            petView.showMessage("屏幕 OCR 已关闭，只看前台 App。", duration: 4)
+            updateMenuStates()
+            return
+        }
+
+        if awarenessEngine.requestScreenCapturePermission() {
+            awarenessEngine.setOCREnabled(true)
+            petView.showMessage("本地 OCR 开启，只识别当前窗口，不保存截图。", duration: 5)
+        } else {
+            awarenessEngine.setOCREnabled(false)
+            showScreenPermissionHelp()
+        }
+        updateMenuStates()
+    }
+
+    @objc private func refreshAwareness() {
+        awarenessEngine.refreshNow()
+        petView.showMessage("正在看看你现在忙什么…", duration: 2.5)
+    }
+
+    @objc private func toggleAwarenessPause() {
+        if awarenessEngine.isPaused || awarenessEngine.selectedManualScene != nil {
+            awarenessEngine.resumeAutomatic()
+            petView.showMessage("自动切换恢复啦！", duration: 3)
+        } else {
+            awarenessEngine.pause(for: 30 * 60)
+            petView.showMessage("暂停感知 30 分钟，当前状态先不动。", duration: 4)
+        }
+        updateMenuStates()
+    }
+
+    @objc private func setOCRIntervalFast() {
+        setOCRInterval(8)
+    }
+
+    @objc private func setOCRIntervalBalanced() {
+        setOCRInterval(15)
+    }
+
+    @objc private func setOCRIntervalGentle() {
+        setOCRInterval(30)
+    }
+
+    private func setOCRInterval(_ interval: TimeInterval) {
+        awarenessEngine.setOCRInterval(interval)
+        petView.showMessage("OCR 识别间隔：\(Int(interval)) 秒。", duration: 3)
+        updateMenuStates()
+    }
+
+    @objc private func previewScene(_ sender: NSMenuItem) {
+        guard let rawValue = sender.representedObject as? String,
+              let scene = PetScene(rawValue: rawValue) else {
+            return
+        }
+        awarenessEngine.preview(scene)
+        updateMenuStates()
+    }
+
+    @objc private func showAwarenessPrivacy() {
+        let alert = NSAlert()
+        alert.messageText = "场景感知与隐私"
+        alert.informativeText = """
+        默认模式只读取当前前台 App 的名称，不需要屏幕权限。
+
+        开启“本地屏幕 OCR”后，笑笑桌宠只截取当前前台窗口，在本机内存中识别文字；不保存截图、不写入识别文字、不联网、不上传。
+
+        你可以随时从菜单关闭 OCR，或在系统设置中撤销屏幕录制权限。
+        """
+        alert.addButton(withTitle: "知道了")
+        alert.addButton(withTitle: "打开屏幕权限设置")
+        NSApp.activate(ignoringOtherApps: true)
+        if alert.runModal() == .alertSecondButtonReturn {
+            openScreenPermissionSettings()
+        }
+    }
+
+    private func showScreenPermissionHelp() {
+        let alert = NSAlert()
+        alert.messageText = "需要屏幕录制权限"
+        alert.informativeText = """
+        本地 OCR 需要 macOS 的“屏幕与系统音频录制”权限。识别只在本机完成，不保存或上传画面。
+
+        授权后若没有立即生效，请退出并重新打开笑笑桌宠。
+        """
+        alert.addButton(withTitle: "打开系统设置")
+        alert.addButton(withTitle: "暂不开启")
+        NSApp.activate(ignoringOtherApps: true)
+        if alert.runModal() == .alertFirstButtonReturn {
+            openScreenPermissionSettings()
+        }
+    }
+
+    private func openScreenPermissionSettings() {
+        guard let url = URL(
+            string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture"
+        ) else { return }
+        NSWorkspace.shared.open(url)
+    }
+
     @objc private func idleMoment() {
         if let quietUntil, Date() >= quietUntil {
             self.quietUntil = nil
@@ -299,7 +571,7 @@ final class PetController: NSObject {
         guard panel.isVisible, !clickThrough, quietUntil == nil else {
             return
         }
-        petView.showMessage(idlePhrases.randomElement()!, duration: 4)
+        petView.showMessage(currentScene.idlePhrases.randomElement()!, duration: 4)
         if Int.random(in: 0...2) == 0 {
             petView.bounce()
         }
@@ -375,7 +647,7 @@ final class PetController: NSObject {
 
     @objc func saySomething() {
         panel.orderFrontRegardless()
-        petView.showMessage(idlePhrases.randomElement()!, duration: 4)
+        petView.showMessage(currentScene.idlePhrases.randomElement()!, duration: 4)
         petView.wiggle()
     }
 
@@ -411,6 +683,18 @@ final class PetController: NSObject {
         findMenuItem(tag: 201, in: menu)?.state = abs(petScale - 0.60) < 0.025 ? .on : .off
         findMenuItem(tag: 202, in: menu)?.state = abs(petScale - 0.74) < 0.025 ? .on : .off
         findMenuItem(tag: 203, in: menu)?.state = abs(petScale - 1.00) < 0.025 ? .on : .off
+        findMenuItem(tag: 301, in: menu)?.state = awarenessEngine.isEnabled ? .on : .off
+        findMenuItem(tag: 302, in: menu)?.state = awarenessEngine.isOCREnabled ? .on : .off
+        findMenuItem(tag: 302, in: menu)?.isEnabled = awarenessEngine.isEnabled
+        findMenuItem(tag: 305, in: menu)?.title = "当前：\(currentScene.emoji) \(currentScene.title)"
+        findMenuItem(tag: 306, in: menu)?.title = awarenessSourceMenuTitle()
+        let isOverridden = awarenessEngine.isPaused || awarenessEngine.selectedManualScene != nil
+        findMenuItem(tag: 303, in: menu)?.title = isOverridden
+            ? "▶️ 恢复自动切换"
+            : "⏸ 暂停感知 30 分钟"
+        findMenuItem(tag: 311, in: menu)?.state = abs(awarenessEngine.ocrInterval - 8) < 0.5 ? .on : .off
+        findMenuItem(tag: 312, in: menu)?.state = abs(awarenessEngine.ocrInterval - 15) < 0.5 ? .on : .off
+        findMenuItem(tag: 313, in: menu)?.state = abs(awarenessEngine.ocrInterval - 30) < 0.5 ? .on : .off
     }
 
     private func findMenuItem(tag: Int, in menu: NSMenu) -> NSMenuItem? {
@@ -491,6 +775,7 @@ final class PetView: NSView {
     private var particles: [PetParticle] = []
     private var message: String?
     private var messageEndsAt: TimeInterval = 0
+    private var scene: PetScene = .companion
     private var phase: CGFloat = 0
     private var lastTick = ProcessInfo.processInfo.systemUptime
     private var bounceStartedAt: TimeInterval?
@@ -535,8 +820,11 @@ final class PetView: NSView {
         let context = NSGraphicsContext.current?.cgContext
         context?.saveGState()
         context?.scaleBy(x: displayScale, y: displayScale)
+        drawSceneBackdrop()
         drawPet()
+        drawSceneDecorations()
         drawParticles()
+        drawSceneBadge()
         drawBubble()
         context?.restoreGState()
     }
@@ -557,10 +845,33 @@ final class PetView: NSView {
     private func drawPet() {
         let now = ProcessInfo.processInfo.systemUptime
         var rect = petRect()
-        let idleBob = sin(phase) * 3
-        var verticalOffset = idleBob
+        var verticalOffset: CGFloat
         var rotation: CGFloat = 0
         var scale: CGFloat = 1
+
+        switch scene.motion {
+        case .calm:
+            verticalOffset = sin(phase) * 3
+        case .focus:
+            verticalOffset = sin(phase * 0.62) * 1.4
+            scale -= 0.008
+        case .busy:
+            verticalOffset = abs(sin(phase * 1.7)) * 2.2
+            rotation += sin(phase * 1.7) * 0.8
+        case .panic:
+            verticalOffset = abs(sin(phase * 4.5)) * 4
+            rotation += sin(phase * 6.5) * 2.8
+        case .dance:
+            verticalOffset = abs(sin(phase * 2.8)) * 8
+            rotation += sin(phase * 2.8) * 4.5
+        case .sleepy:
+            verticalOffset = sin(phase * 0.35) * 1.2
+            rotation -= 1.2
+            scale -= 0.015
+        case .celebrate:
+            verticalOffset = abs(sin(phase * 3.2)) * 7
+            rotation += sin(phase * 3.2) * 3
+        }
 
         if walking {
             verticalOffset += abs(sin(phase * 4)) * 9
@@ -607,6 +918,119 @@ final class PetView: NSView {
             hints: [.interpolation: NSImageInterpolation.high]
         )
         context?.restoreGState()
+    }
+
+    private func drawSceneBackdrop() {
+        let glowRect = NSRect(x: 43, y: 12, width: 234, height: 52)
+        let glow = NSBezierPath(ovalIn: glowRect)
+        scene.accentColor.withAlphaComponent(0.16).setFill()
+        glow.fill()
+
+        let innerRect = glowRect.insetBy(dx: 28, dy: 10)
+        scene.accentColor.withAlphaComponent(0.12).setFill()
+        NSBezierPath(ovalIn: innerRect).fill()
+    }
+
+    private func drawSceneDecorations() {
+        let symbols = scene.ambientSymbols
+        let positions = [
+            NSPoint(x: 38, y: 246),
+            NSPoint(x: 268, y: 225),
+            NSPoint(x: 49, y: 116)
+        ]
+
+        for index in 0..<min(symbols.count, positions.count) {
+            let floatOffset = sin(phase * 1.2 + CGFloat(index) * 1.8) * 7
+            let attributes: [NSAttributedString.Key: Any] = [
+                .font: NSFont.systemFont(
+                    ofSize: symbols[index].count > 2 ? 13 : 19,
+                    weight: .bold
+                ),
+                .foregroundColor: scene.accentColor.withAlphaComponent(0.82)
+            ]
+            let value = symbols[index] as NSString
+            let size = value.size(withAttributes: attributes)
+            value.draw(
+                at: NSPoint(
+                    x: positions[index].x - size.width / 2,
+                    y: positions[index].y + floatOffset
+                ),
+                withAttributes: attributes
+            )
+        }
+
+        if scene == .jailWork {
+            drawJailBars()
+        } else if scene == .meeting {
+            drawCornerProp("🔇")
+        } else if scene == .reading {
+            drawCornerProp("📖")
+        } else if scene == .coding {
+            drawCornerProp("⌨️")
+        } else if scene == .finance {
+            drawCornerProp("📈")
+        } else if scene == .music {
+            drawCornerProp("🎧")
+        }
+    }
+
+    private func drawJailBars() {
+        let barColor = NSColor(calibratedWhite: 0.19, alpha: 0.19)
+        barColor.setStroke()
+        for x in stride(from: CGFloat(58), through: CGFloat(262), by: 34) {
+            let bar = NSBezierPath()
+            bar.lineWidth = 5
+            bar.lineCapStyle = .round
+            bar.move(to: NSPoint(x: x, y: 55))
+            bar.line(to: NSPoint(x: x, y: 315))
+            bar.stroke()
+        }
+        for y in [CGFloat(88), CGFloat(289)] {
+            let rail = NSBezierPath()
+            rail.lineWidth = 7
+            rail.move(to: NSPoint(x: 48, y: y))
+            rail.line(to: NSPoint(x: 272, y: y))
+            rail.stroke()
+        }
+    }
+
+    private func drawCornerProp(_ prop: String) {
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: 28),
+            .foregroundColor: NSColor.white
+        ]
+        (prop as NSString).draw(
+            at: NSPoint(x: 236, y: 73 + sin(phase * 1.4) * 3),
+            withAttributes: attributes
+        )
+    }
+
+    private func drawSceneBadge() {
+        guard message == nil else { return }
+        let badgeRect = NSRect(x: 69, y: 376, width: 182, height: 32)
+        let shadow = NSShadow()
+        shadow.shadowColor = NSColor.black.withAlphaComponent(0.18)
+        shadow.shadowBlurRadius = 7
+        shadow.shadowOffset = NSSize(width: 0, height: -2)
+        shadow.set()
+
+        scene.accentColor.withAlphaComponent(0.94).setFill()
+        NSBezierPath(roundedRect: badgeRect, xRadius: 16, yRadius: 16).fill()
+
+        NSGraphicsContext.current?.saveGraphicsState()
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.alignment = .center
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: 14, weight: .bold),
+            .foregroundColor: NSColor.white,
+            .paragraphStyle: paragraph
+        ]
+        ("\(scene.emoji) \(scene.title)" as NSString).draw(
+            with: badgeRect.insetBy(dx: 8, dy: 7),
+            options: [.usesLineFragmentOrigin],
+            attributes: attributes
+        )
+        NSGraphicsContext.current?.restoreGraphicsState()
     }
 
     private func drawBubble() {
@@ -692,6 +1116,11 @@ final class PetView: NSView {
     func showMessage(_ text: String, duration: TimeInterval) {
         message = text
         messageEndsAt = ProcessInfo.processInfo.systemUptime + duration
+        needsDisplay = true
+    }
+
+    func setScene(_ newScene: PetScene) {
+        scene = newScene
         needsDisplay = true
     }
 
