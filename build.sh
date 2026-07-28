@@ -30,9 +30,12 @@ xcrun --sdk macosx swiftc \
   -parse-as-library \
   -O \
   -target arm64-apple-macos13.0 \
+  "$PROJECT_DIR/Sources/Awareness.swift" \
   "$PROJECT_DIR/Sources/PetApp.swift" \
   -framework AppKit \
   -framework QuartzCore \
+  -framework ScreenCaptureKit \
+  -framework Vision \
   -o "$BUILD_DIR/SmilePet-arm64"
 
 xcrun --sdk macosx swiftc \
@@ -40,9 +43,12 @@ xcrun --sdk macosx swiftc \
   -parse-as-library \
   -O \
   -target x86_64-apple-macos13.0 \
+  "$PROJECT_DIR/Sources/Awareness.swift" \
   "$PROJECT_DIR/Sources/PetApp.swift" \
   -framework AppKit \
   -framework QuartzCore \
+  -framework ScreenCaptureKit \
+  -framework Vision \
   -o "$BUILD_DIR/SmilePet-x86_64"
 
 lipo -create \

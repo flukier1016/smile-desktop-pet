@@ -13,6 +13,8 @@ jobs:
     runs-on: macos-14
     steps:
       - uses: actions/checkout@v5
+      - name: Test scene classifier
+        run: ./scripts/test.sh
       - name: Build universal app
         run: ./build.sh
       - name: Verify bundle
