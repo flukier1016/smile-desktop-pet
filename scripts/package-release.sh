@@ -6,8 +6,8 @@ VERSION="${1:-1.0.0}"
 APP_NAME="笑笑桌宠"
 DIST_DIR="$PROJECT_DIR/dist"
 STAGE_DIR="$DIST_DIR/$APP_NAME-v$VERSION"
-ZIP_PATH="$DIST_DIR/$APP_NAME-v$VERSION-macos-universal.zip"
-DMG_PATH="$DIST_DIR/$APP_NAME-v$VERSION-macos-universal.dmg"
+ZIP_PATH="$DIST_DIR/SmilePet-v$VERSION-macos-universal.zip"
+DMG_PATH="$DIST_DIR/SmilePet-v$VERSION-macos-universal.dmg"
 CHECKSUM_PATH="$DIST_DIR/SHA256SUMS.txt"
 
 if [[ ! "$VERSION" =~ '^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$' ]]; then

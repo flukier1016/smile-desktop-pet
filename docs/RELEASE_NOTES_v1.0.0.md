@@ -14,8 +14,8 @@
 
 ## 下载哪个
 
-- 推荐：`笑笑桌宠-v1.0.0-macos-universal.dmg`
-- 备用：`笑笑桌宠-v1.0.0-macos-universal.zip`
+- 推荐：`SmilePet-v1.0.0-macos-universal.dmg`
+- 备用：`SmilePet-v1.0.0-macos-universal.zip`
 - 校验：`SHA256SUMS.txt`
 
 当前版本使用临时签名，尚未进行 Apple 公证。第一次启动请在 Finder 中右键 App，选择“打开”，再确认一次。

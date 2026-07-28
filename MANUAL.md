@@ -8,14 +8,14 @@
 
 ### 推荐：DMG
 
-1. 在 GitHub Releases 下载 `笑笑桌宠-v1.0.0-macos-universal.dmg`。
+1. 在 GitHub Releases 下载 `SmilePet-v1.0.0-macos-universal.dmg`。
 2. 双击打开 DMG。
 3. 把“笑笑桌宠”拖到“应用程序”文件夹。
 4. 推出 DMG。
 
 ### 备用：ZIP
 
-1. 下载 `笑笑桌宠-v1.0.0-macos-universal.zip`。
+1. 下载 `SmilePet-v1.0.0-macos-universal.zip`。
 2. 双击解压。
 3. 把“笑笑桌宠”拖到“应用程序”文件夹。
 

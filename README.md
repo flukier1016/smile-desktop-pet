@@ -12,8 +12,8 @@
 
 打开 [Releases](../../releases/latest)，下载以下任一文件：
 
-- `笑笑桌宠-v1.0.0-macos-universal.dmg`：推荐，打开后把 App 拖到“应用程序”。
-- `笑笑桌宠-v1.0.0-macos-universal.zip`：解压后直接运行。
+- `SmilePet-v1.0.0-macos-universal.dmg`：推荐，打开后把 App 拖到“应用程序”。
+- `SmilePet-v1.0.0-macos-universal.zip`：解压后直接运行。
 - `SHA256SUMS.txt`：用于校验下载文件是否完整。
 
 支持 macOS 13 或更高版本，同时兼容 Apple Silicon 和 Intel Mac。
