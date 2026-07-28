@@ -12,8 +12,8 @@
 
 打开 [Releases](../../releases/latest)，下载以下任一文件：
 
-- `SmilePet-v1.0.0-macos-universal.dmg`：推荐，打开后把 App 拖到“应用程序”。
-- `SmilePet-v1.0.0-macos-universal.zip`：解压后直接运行。
+- `SmilePet-v1.1.0-macos-universal.dmg`：推荐，打开后把 App 拖到“应用程序”。
+- `SmilePet-v1.1.0-macos-universal.zip`：解压后直接运行。
 - `SHA256SUMS.txt`：用于校验下载文件是否完整。
 
 支持 macOS 13 或更高版本，同时兼容 Apple Silicon 和 Intel Mac。
@@ -26,6 +26,7 @@
 - 单击身体：戳一下，她会弹跳反击。
 - 双击：旋转、撒彩带，快乐加载到 100%。
 - 拖拽：把她放到屏幕任意位置，下次启动会记住。
+- 调整大小：右键或菜单栏选择迷你／标准／大只；按住 `Option` 滚轮可连续缩放。
 - 右键：喂零食、夸夸、抽今日运气、出去散步、暂时躲起来。
 - 菜单栏笑脸：随时召回、开启鼠标穿透、安静十分钟或退出。
 - 自动碎碎念：喝水提醒、摸鱼批准、随机小剧场。
@@ -55,7 +56,7 @@ open "笑笑桌宠.app"
 打 Release 包：
 
 ```bash
-./scripts/package-release.sh 1.0.0
+./scripts/package-release.sh 1.1.0
 ```
 
 产物位于 `dist/`。
