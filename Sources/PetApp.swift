@@ -33,7 +33,13 @@ final class PetPanel: NSPanel {
 }
 
 final class PetController: NSObject {
-    private let windowSize = NSSize(width: 320, height: 430)
+    private let baseWindowSize = NSSize(width: 320, height: 430)
+    private let minimumScale: CGFloat = 0.55
+    private let maximumScale: CGFloat = 1.10
+    private var petScale: CGFloat = {
+        let saved = UserDefaults.standard.double(forKey: "petScale")
+        return saved > 0 ? CGFloat(saved) : 0.74
+    }()
     private var panel: PetPanel!
     private var petView: PetView!
     private var statusItem: NSStatusItem!
@@ -84,6 +90,7 @@ final class PetController: NSObject {
     }
 
     private func makePanel() {
+        let windowSize = scaledWindowSize(for: petScale)
         panel = PetPanel(
             contentRect: NSRect(origin: .zero, size: windowSize),
             styleMask: [.borderless, .nonactivatingPanel],
@@ -112,6 +119,7 @@ final class PetController: NSObject {
         }
 
         petView = PetView(frame: NSRect(origin: .zero, size: windowSize), image: image)
+        petView.autoresizingMask = [.width, .height]
         petView.controller = self
         panel.contentView = petView
     }
@@ -129,6 +137,7 @@ final class PetController: NSObject {
         let menu = NSMenu()
         addMenuItem("👋 叫她回来", action: #selector(bringBack), to: menu)
         addMenuItem("💬 让她说句话", action: #selector(saySomething), to: menu)
+        addSizeSubmenu(to: menu)
         menu.addItem(.separator())
 
         let passItem = NSMenuItem(
@@ -166,10 +175,36 @@ final class PetController: NSObject {
         addMenuItem("✨ 夸夸她", action: #selector(praise), to: menu)
         addMenuItem("🔮 今日小运气", action: #selector(fortune), to: menu)
         addMenuItem("🐾 出去散个步", action: #selector(takeAWalk), to: menu)
+        addSizeSubmenu(to: menu)
         menu.addItem(.separator())
         addMenuItem("🫣 躲 5 分钟", action: #selector(hideForFiveMinutes), to: menu)
         addMenuItem("退出", action: #selector(quit), to: menu)
         return menu
+    }
+
+    private func addSizeSubmenu(to menu: NSMenu) {
+        let sizeItem = NSMenuItem(title: "↔️ 调整大小", action: nil, keyEquivalent: "")
+        let sizeMenu = NSMenu()
+        let presets: [(String, Selector, Int, CGFloat)] = [
+            ("迷你 60%", #selector(setMiniSize), 201, 0.60),
+            ("标准 75%", #selector(setStandardSize), 202, 0.74),
+            ("大只 100%", #selector(setLargeSize), 203, 1.00)
+        ]
+
+        for preset in presets {
+            let item = NSMenuItem(title: preset.0, action: preset.1, keyEquivalent: "")
+            item.target = self
+            item.tag = preset.2
+            item.state = abs(petScale - preset.3) < 0.025 ? .on : .off
+            sizeMenu.addItem(item)
+        }
+
+        sizeMenu.addItem(.separator())
+        let hint = NSMenuItem(title: "按住 Option 滚轮可微调", action: nil, keyEquivalent: "")
+        hint.isEnabled = false
+        sizeMenu.addItem(hint)
+        sizeItem.submenu = sizeMenu
+        menu.addItem(sizeItem)
     }
 
     func tapped(at point: NSPoint) {
@@ -211,6 +246,49 @@ final class PetController: NSObject {
     func savePosition() {
         UserDefaults.standard.set(panel.frame.origin.x, forKey: "petX")
         UserDefaults.standard.set(panel.frame.origin.y, forKey: "petY")
+    }
+
+    func adjustScale(by scrollDelta: CGFloat) {
+        let step = max(-0.08, min(0.08, scrollDelta * 0.012))
+        guard abs(step) > 0.001 else { return }
+        applyScale(petScale + step)
+    }
+
+    @objc private func setMiniSize() {
+        applyScale(0.60)
+    }
+
+    @objc private func setStandardSize() {
+        applyScale(0.74)
+    }
+
+    @objc private func setLargeSize() {
+        applyScale(1.00)
+    }
+
+    private func applyScale(_ requestedScale: CGFloat) {
+        let newScale = min(max(requestedScale, minimumScale), maximumScale)
+        guard abs(newScale - petScale) > 0.001 else { return }
+
+        let oldFrame = panel.frame
+        petScale = newScale
+        let newSize = scaledWindowSize(for: newScale)
+        let newOrigin = NSPoint(
+            x: oldFrame.midX - newSize.width / 2,
+            y: oldFrame.midY - newSize.height / 2
+        )
+        panel.setFrame(NSRect(origin: newOrigin, size: newSize), display: true)
+        UserDefaults.standard.set(Double(newScale), forKey: "petScale")
+        constrainToVisibleScreen()
+        updateMenuStates()
+        petView.showMessage("现在是 \(Int(round(newScale * 100)))% 大小～", duration: 1.6)
+    }
+
+    private func scaledWindowSize(for scale: CGFloat) -> NSSize {
+        NSSize(
+            width: round(baseWindowSize.width * scale),
+            height: round(baseWindowSize.height * scale)
+        )
     }
 
     @objc private func idleMoment() {
@@ -327,9 +405,25 @@ final class PetController: NSObject {
 
     private func updateMenuStates() {
         guard let menu = statusItem.menu else { return }
-        menu.item(withTag: 101)?.state = clickThrough ? .on : .off
+        findMenuItem(tag: 101, in: menu)?.state = clickThrough ? .on : .off
         let isQuiet = quietUntil.map { $0 > Date() } ?? false
-        menu.item(withTag: 102)?.state = isQuiet ? .on : .off
+        findMenuItem(tag: 102, in: menu)?.state = isQuiet ? .on : .off
+        findMenuItem(tag: 201, in: menu)?.state = abs(petScale - 0.60) < 0.025 ? .on : .off
+        findMenuItem(tag: 202, in: menu)?.state = abs(petScale - 0.74) < 0.025 ? .on : .off
+        findMenuItem(tag: 203, in: menu)?.state = abs(petScale - 1.00) < 0.025 ? .on : .off
+    }
+
+    private func findMenuItem(tag: Int, in menu: NSMenu) -> NSMenuItem? {
+        for item in menu.items {
+            if item.tag == tag {
+                return item
+            }
+            if let submenu = item.submenu,
+               let match = findMenuItem(tag: tag, in: submenu) {
+                return match
+            }
+        }
+        return nil
     }
 
     @objc private func screenLayoutChanged() {
@@ -354,7 +448,7 @@ final class PetController: NSObject {
             )
         } else {
             origin = NSPoint(
-                x: visible.maxX - windowSize.width - 24,
+                x: visible.maxX - panel.frame.width - 24,
                 y: visible.minY + 20
             )
         }
@@ -392,6 +486,7 @@ final class PetView: NSView {
     var walking = false
 
     private let image: NSImage
+    private let logicalSize = NSSize(width: 320, height: 430)
     private var animationTimer: Timer?
     private var particles: [PetParticle] = []
     private var message: String?
@@ -436,13 +531,18 @@ final class PetView: NSView {
 
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
+        guard displayScale > 0 else { return }
+        let context = NSGraphicsContext.current?.cgContext
+        context?.saveGState()
+        context?.scaleBy(x: displayScale, y: displayScale)
         drawPet()
         drawParticles()
         drawBubble()
+        context?.restoreGState()
     }
 
     private func petRect() -> NSRect {
-        let area = NSRect(x: 18, y: 8, width: bounds.width - 36, height: 352)
+        let area = NSRect(x: 18, y: 8, width: logicalSize.width - 36, height: 352)
         let aspect = image.size.width / image.size.height
         let width = min(area.width, area.height * aspect)
         let height = width / aspect
@@ -511,7 +611,7 @@ final class PetView: NSView {
 
     private func drawBubble() {
         guard let message else { return }
-        let bubbleRect = NSRect(x: 8, y: 350, width: bounds.width - 16, height: 70)
+        let bubbleRect = NSRect(x: 8, y: 350, width: logicalSize.width - 16, height: 70)
         let shadow = NSShadow()
         shadow.shadowColor = NSColor.black.withAlphaComponent(0.18)
         shadow.shadowBlurRadius = 10
@@ -605,7 +705,7 @@ final class PetView: NSView {
 
     func patReaction() {
         patEndsAt = ProcessInfo.processInfo.systemUptime + 0.75
-        celebrate(symbols: ["♥︎", "♥︎", "✨"], count: 8, origin: NSPoint(x: bounds.midX, y: 275))
+        celebrate(symbols: ["♥︎", "♥︎", "✨"], count: 8, origin: NSPoint(x: logicalSize.width / 2, y: 275))
     }
 
     func party() {
@@ -614,7 +714,7 @@ final class PetView: NSView {
     }
 
     func feed(with food: String) {
-        celebrate(symbols: [food, "♥︎", "✨"], count: 12, origin: NSPoint(x: bounds.midX, y: 205))
+        celebrate(symbols: [food, "♥︎", "✨"], count: 12, origin: NSPoint(x: logicalSize.width / 2, y: 205))
         bounce()
     }
 
@@ -624,7 +724,7 @@ final class PetView: NSView {
         origin: NSPoint? = nil
     ) {
         let now = ProcessInfo.processInfo.systemUptime
-        let center = origin ?? NSPoint(x: bounds.midX, y: 225)
+        let center = origin ?? NSPoint(x: logicalSize.width / 2, y: 225)
         for _ in 0..<count {
             particles.append(
                 PetParticle(
@@ -672,12 +772,30 @@ final class PetView: NSView {
         if dragged {
             controller?.savePosition()
         } else if event.clickCount < 2 {
-            controller?.tapped(at: convert(event.locationInWindow, from: nil))
+            let actualPoint = convert(event.locationInWindow, from: nil)
+            controller?.tapped(
+                at: NSPoint(
+                    x: actualPoint.x / displayScale,
+                    y: actualPoint.y / displayScale
+                )
+            )
+        }
+    }
+
+    override func scrollWheel(with event: NSEvent) {
+        if event.modifierFlags.contains(.option) {
+            controller?.adjustScale(by: event.scrollingDeltaY)
+        } else {
+            super.scrollWheel(with: event)
         }
     }
 
     override func rightMouseDown(with event: NSEvent) {
         guard let menu = controller?.contextualMenu() else { return }
         NSMenu.popUpContextMenu(menu, with: event, for: self)
+    }
+
+    private var displayScale: CGFloat {
+        min(bounds.width / logicalSize.width, bounds.height / logicalSize.height)
     }
 }
