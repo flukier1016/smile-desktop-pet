@@ -1,0 +1,10 @@
+.DS_Store
+.build/
+dist/
+*.app/
+
+# The source photo and chroma-key generation intermediate are private.
+Assets/pet_chroma.png
+Assets/original*
+*.jpg
+*.jpeg

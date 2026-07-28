@@ -1,0 +1,27 @@
+笑笑桌宠 v1.0.0
+===================
+
+系统要求
+macOS 13 或更高版本，支持 Apple Silicon 与 Intel Mac。
+
+第一次打开
+1. 把“笑笑桌宠”拖到“应用程序”。
+2. 在 Finder 中右键“笑笑桌宠”，选择“打开”。
+3. 在确认框中再次选择“打开”。
+
+怎么玩
+单击头部：摸摸头。
+单击身体：戳一下。
+双击：快乐爆发。
+拖拽：移动位置。
+右键：喂食、夸夸、运势、散步等。
+菜单栏笑脸：召回、鼠标穿透、安静或退出。
+
+隐私
+完全离线，不联网，不收集数据，不申请相机、麦克风或文件权限。
+
+完整手册
+https://github.com/flukier1016/smile-desktop-pet/blob/main/MANUAL.md
+
+官方发布页
+https://github.com/flukier1016/smile-desktop-pet/releases

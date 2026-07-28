@@ -1,0 +1,23 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  macos-universal:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build universal app
+        run: ./build.sh
+      - name: Verify bundle
+        run: |
+          plutil -lint "笑笑桌宠.app/Contents/Info.plist"
+          codesign --verify --deep --strict "笑笑桌宠.app"
+          test "$(lipo -archs "笑笑桌宠.app/Contents/MacOS/SmilePet")" = "x86_64 arm64" \
+            || test "$(lipo -archs "笑笑桌宠.app/Contents/MacOS/SmilePet")" = "arm64 x86_64"
