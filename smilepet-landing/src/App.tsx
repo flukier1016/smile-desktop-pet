@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties, type PointerEvent } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type PointerEvent } from 'react'
 import {
   Apple,
   ArrowDownToLine,
@@ -124,15 +124,37 @@ function useReducedMotion() {
 
 function SpritePet() {
   const [frame, setFrame] = useState(24)
+  const [isReady, setIsReady] = useState(false)
+  const petRef = useRef<HTMLDivElement>(null)
   const reducedMotion = useReducedMotion()
 
   useEffect(() => {
-    if (reducedMotion) return
+    const pet = petRef.current
+    if (!pet || !('IntersectionObserver' in window)) {
+      setIsReady(true)
+      return
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsReady(true)
+          observer.disconnect()
+        }
+      },
+      { rootMargin: '800px 0px' },
+    )
+    observer.observe(pet)
+    return () => observer.disconnect()
+  }, [])
+
+  useEffect(() => {
+    if (reducedMotion || !isReady) return
     const timer = window.setInterval(() => {
       setFrame((current) => (current + 1) % 88)
     }, 115)
     return () => window.clearInterval(timer)
-  }, [reducedMotion])
+  }, [isReady, reducedMotion])
 
   const column = frame % 8
   const row = Math.floor(frame / 8)
@@ -141,7 +163,13 @@ function SpritePet() {
   }
 
   return (
-    <div className="sprite-pet" style={style} role="img" aria-label="88 帧动态笑笑桌宠" />
+    <div
+      ref={petRef}
+      className={`sprite-pet${isReady ? ' is-ready' : ''}`}
+      style={style}
+      role="img"
+      aria-label="88 帧动态笑笑桌宠"
+    />
   )
 }
 
@@ -262,7 +290,7 @@ function App() {
       <nav className="nav-shell" aria-label="主导航">
         <a className="brand" href="#top" aria-label="笑笑桌宠首页">
           <span className="brand-mark">
-            <img src="/app-icon.avif" alt="" width="512" height="512" />
+            <img src="/app-icon-64.png" alt="" width="64" height="64" />
           </span>
           <span className="brand-copy">
             <strong>笑笑桌宠</strong>
@@ -728,7 +756,7 @@ function App() {
       <footer>
         <a className="brand footer-brand" href="#top">
           <span className="brand-mark">
-            <img src="/app-icon.avif" alt="" width="512" height="512" loading="lazy" />
+            <img src="/app-icon-64.png" alt="" width="64" height="64" loading="lazy" />
           </span>
           <span className="brand-copy">
             <strong>笑笑桌宠</strong>
