@@ -2,6 +2,8 @@
 
 <img src="docs/media/hero.png" alt="笑笑桌宠产品横幅" width="100%">
 
+<img src="docs/media/app-icon.png" alt="笑笑桌宠人物版应用图标" width="112">
+
 # 笑笑桌宠
 
 **会看场景、会接话、还能被你慢慢养熟的原生 macOS 桌面搭子。**
@@ -48,13 +50,13 @@
 | 戳一下、散步、庆祝 | 随时互动并继续积累经验 |
 | 经验升级 | 解锁“熟悉同桌”“默契拍档”“桌面知己”等称号 |
 
-第一次启动 v1.4.0 会直接展示陪伴页。成长数据使用 macOS 用户偏好保存在本机，
+第一次启动 v1.4.1 会直接展示陪伴页。成长数据使用 macOS 用户偏好保存在本机，
 不需要账号，也不会联网同步。
 
 ## 三分钟上手
 
 1. 打开 [Releases](../../releases/latest)，下载
-   `SmilePet-v1.4.0-macos-universal.dmg`。
+   `SmilePet-v1.4.1-macos-universal.dmg`。
 2. 把“笑笑桌宠”拖到“应用程序”。
 3. 第一次启动时，在 Finder 右键 App，选择“打开”并确认。
 4. 在首次出现的控制中心完成一项互动，或点击菜单栏笑脸随时再次打开。
@@ -116,7 +118,7 @@ open "笑笑桌宠.app"
 打包 Release：
 
 ```bash
-./scripts/package-release.sh 1.4.0
+./scripts/package-release.sh 1.4.1
 ```
 
 ## 开源与参与

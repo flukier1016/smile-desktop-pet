@@ -2,6 +2,8 @@
 
 <img src="docs/media/hero.png" alt="Smile Desktop Pet" width="100%">
 
+<img src="docs/media/app-icon.png" alt="Smile Desktop Pet character app icon" width="112">
+
 # Smile Desktop Pet
 
 **A playful, context-aware desktop companion that grows with you on macOS.**
@@ -34,7 +36,7 @@ actions build experience, a companion streak, and five relationship levels.
 
 ## Install
 
-Download `SmilePet-v1.4.0-macos-universal.dmg` from the
+Download `SmilePet-v1.4.1-macos-universal.dmg` from the
 [latest release](../../releases/latest), drag the app to Applications, then
 Control-click it and choose **Open** on first launch.
 

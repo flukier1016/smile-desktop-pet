@@ -2,7 +2,7 @@
 set -euo pipefail
 
 PROJECT_DIR="${0:A:h:h}"
-VERSION="${1:-1.4.0}"
+VERSION="${1:-1.4.1}"
 APP_NAME="笑笑桌宠"
 DIST_DIR="$PROJECT_DIR/dist"
 STAGE_DIR="$DIST_DIR/$APP_NAME-v$VERSION"
