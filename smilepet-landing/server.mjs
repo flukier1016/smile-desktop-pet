@@ -64,9 +64,19 @@ function cacheControl(pathname) {
     return 'public, max-age=31536000, immutable'
   }
   if (pathname.endsWith('.html')) {
-    return 'no-cache'
+    return 'public, max-age=0, s-maxage=3600, stale-while-revalidate=86400'
   }
   return 'public, max-age=86400'
+}
+
+function fileEtag(file) {
+  return `W/"${file.size.toString(16)}-${Math.trunc(file.mtimeMs).toString(16)}"`
+}
+
+function requestHasEtag(request, etag) {
+  const candidates = request.headers['if-none-match']
+  if (!candidates) return false
+  return candidates === '*' || candidates.split(',').some((candidate) => candidate.trim() === etag)
 }
 
 function acceptedCompression(request, extension, size) {
@@ -121,13 +131,22 @@ const server = createServer(async (request, response) => {
     }
 
     const extension = extname(filePath).toLowerCase()
-    const compression = acceptedCompression(request, extension, file.size)
+    const etag = fileEtag(file)
     const headers = {
       'Cache-Control': cacheControl(filePath),
       'Content-Type': contentTypes[extension] || 'application/octet-stream',
+      ETag: etag,
+      'Last-Modified': file.mtime.toUTCString(),
       Vary: 'Accept-Encoding',
     }
 
+    if (requestHasEtag(request, etag)) {
+      response.writeHead(304, headers)
+      response.end()
+      return
+    }
+
+    const compression = acceptedCompression(request, extension, file.size)
     if (compression) {
       headers['Content-Encoding'] = compression
     } else {

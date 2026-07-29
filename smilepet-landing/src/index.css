@@ -2305,15 +2305,18 @@ main {
   width: 192px;
   height: 208px;
   transform: scale(1.24);
+  background-repeat: no-repeat;
+  image-rendering: auto;
+  filter: drop-shadow(0 20px 18px rgba(0, 0, 0, 0.36));
+}
+
+.sprite-pet.is-ready {
   background-image: url("/spritesheet.webp");
   background-image: image-set(
     url("/spritesheet.webp") type("image/webp"),
     url("/spritesheet.png") type("image/png")
   );
-  background-repeat: no-repeat;
   background-size: 800% 1100%;
-  image-rendering: auto;
-  filter: drop-shadow(0 20px 18px rgba(0, 0, 0, 0.36));
 }
 
 .sprite-caption {
