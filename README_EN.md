@@ -4,7 +4,7 @@
 
 # Smile Desktop Pet
 
-**A playful, context-aware, privacy-first desktop companion for macOS.**
+**A playful, context-aware desktop companion that grows with you on macOS.**
 
 [Download](../../releases/latest) · [Chinese README](README.md) · [User guide](MANUAL.md) · [Contributing](CONTRIBUTING.md)
 
@@ -17,21 +17,24 @@
 Smile lives above your desktop without taking a Dock slot. She reacts to clicks,
 remembers her position and size, and automatically switches between 23 scenes
 such as coding, debugging, tests passing, spreadsheets, markets, meetings,
-reading, entertainment, breaks, and late-night work.
+reading, entertainment, breaks, and late-night work. Four small daily care
+actions build experience, a companion streak, and five relationship levels.
 
 ## Highlights
 
 - Native Swift/AppKit app for macOS 13 and later.
 - Universal binary for Apple Silicon and Intel.
-- Polished control center for size, awareness, local OCR, refresh cadence, and privacy state.
+- Companion-first control center with daily care, XP, streaks, and direct interactions.
+- Separate settings page for size, awareness, local OCR, refresh cadence, and privacy state.
 - Foreground-app awareness works without screen-recording permission.
 - Optional OCR examines only the frontmost window using Apple Vision.
 - No accounts, ads, analytics, telemetry, screenshot storage, or network requests.
-- Includes an optional native Codex theme and 88-frame custom Codex pet.
+- Keyboard navigation, VoiceOver semantics, and Reduce Motion support.
+- Includes an optional warm cream/red Codex theme and 88-frame custom Codex pet.
 
 ## Install
 
-Download `SmilePet-v1.3.0-macos-universal.dmg` from the
+Download `SmilePet-v1.4.0-macos-universal.dmg` from the
 [latest release](../../releases/latest), drag the app to Applications, then
 Control-click it and choose **Open** on first launch.
 
@@ -53,7 +56,21 @@ cd smile-desktop-pet
 
 The default classifier reads only the frontmost application name and bundle
 identifier. Optional OCR captures one frontmost window, recognizes text in
-memory, and immediately discards the image and text. See [PRIVACY.md](PRIVACY.md).
+memory, and immediately discards the image and text. Companion progress is
+stored only in local macOS preferences. See [PRIVACY.md](PRIVACY.md).
+
+## Codex skin
+
+The optional skin applies an 88-frame Smile mascot, matching light and dark
+chrome colors, and Rosé Pine code themes through Codex's supported custom
+configuration. It does not modify or re-sign the official Codex app.
+
+```bash
+./scripts/install-codex-skin.sh
+```
+
+The installer validates the format and creates a restorable configuration
+backup. See [CodexSkin/README.md](CodexSkin/README.md).
 
 ## License
 

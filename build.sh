@@ -31,6 +31,7 @@ xcrun --sdk macosx swiftc \
   -O \
   -target arm64-apple-macos13.0 \
   "$PROJECT_DIR/Sources/Awareness.swift" \
+  "$PROJECT_DIR/Sources/CompanionProgress.swift" \
   "$PROJECT_DIR/Sources/ControlCenter.swift" \
   "$PROJECT_DIR/Sources/PetApp.swift" \
   -framework AppKit \
@@ -45,6 +46,7 @@ xcrun --sdk macosx swiftc \
   -O \
   -target x86_64-apple-macos13.0 \
   "$PROJECT_DIR/Sources/Awareness.swift" \
+  "$PROJECT_DIR/Sources/CompanionProgress.swift" \
   "$PROJECT_DIR/Sources/ControlCenter.swift" \
   "$PROJECT_DIR/Sources/PetApp.swift" \
   -framework AppKit \

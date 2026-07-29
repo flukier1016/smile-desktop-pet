@@ -48,15 +48,17 @@ if [[ -f "$BACKUP_POINTER" ]]; then
   esac
 fi
 if [[ -z "$backup_path" ]]; then
-  timestamp=$(date -u +"%Y%m%dT%H%M%SZ")
-  backup_path="$BACKUP_DIR/config-before-smile-skin-$timestamp.toml"
-  cp -p "$CODEX_CONFIG" "$backup_path"
-  print -r -- "$backup_path" > "$BACKUP_POINTER"
+    timestamp=$(date -u +"%Y%m%dT%H%M%SZ")
+    backup_path="$BACKUP_DIR/config-before-smile-skin-$timestamp.toml"
+    cp -p "$CODEX_CONFIG" "$backup_path"
+    chmod 600 "$backup_path"
+    print -r -- "$backup_path" > "$BACKUP_POINTER"
 fi
 
 install -m 0644 "$SPRITESHEET" "$PET_DIR/spritesheet.png"
 install -m 0644 "$PROJECT_DIR/CodexSkin/pet.json" "$PET_DIR/pet.json"
 xcrun swift "$PROJECT_DIR/Tools/apply_codex_skin.swift" "$CODEX_CONFIG"
+chmod 600 "$CODEX_CONFIG"
 
 echo "Installed Codex skin: 笑笑"
 echo "Backup: $backup_path"

@@ -116,9 +116,19 @@ guard CommandLine.arguments.count == 2 else {
 
 let configURL = URL(fileURLWithPath: CommandLine.arguments[1])
 do {
+    let attributes = try FileManager.default.attributesOfItem(
+        atPath: configURL.path
+    )
+    let originalPermissions = attributes[.posixPermissions]
     let source = try String(contentsOf: configURL, encoding: .utf8)
     let updated = patch(source)
     try updated.write(to: configURL, atomically: true, encoding: .utf8)
+    if let originalPermissions {
+        try FileManager.default.setAttributes(
+            [.posixPermissions: originalPermissions],
+            ofItemAtPath: configURL.path
+        )
+    }
     print("Updated Codex appearance: \(configURL.path)")
 } catch {
     FileHandle.standardError.write(

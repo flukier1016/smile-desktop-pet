@@ -24,6 +24,7 @@ if [[ ! -f "$backup_path" ]]; then
 fi
 
 cp -p "$backup_path" "$CODEX_CONFIG"
+chmod 600 "$CODEX_CONFIG"
 if [[ -f "$PET_DIR/pet.json" ]]; then
   rm "$PET_DIR/pet.json"
 fi

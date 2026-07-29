@@ -20,6 +20,7 @@ xcrun --sdk macosx swiftc \
   -Onone \
   -target "$target" \
   "$PROJECT_DIR/Sources/Awareness.swift" \
+  "$PROJECT_DIR/Sources/CompanionProgress.swift" \
   "$PROJECT_DIR/Sources/ControlCenter.swift" \
   "$PROJECT_DIR/Sources/PetApp.swift" \
   -framework AppKit \
