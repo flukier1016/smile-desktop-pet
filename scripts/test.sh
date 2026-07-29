@@ -43,9 +43,9 @@ xcrun swift "$PROJECT_DIR/Tools/apply_codex_skin.swift" "$skin_config" >/dev/nul
 
 cmp -s "$first_result" "$skin_config"
 [[ "$(stat -f %Lp "$skin_config")" == "600" ]]
-rg -q '^model = "keep-me"$' "$skin_config"
-rg -q '^untouched = "still-here"$' "$skin_config"
-rg -q '^key = "value"$' "$skin_config"
-[[ "$(rg -c '^selected-avatar-id = \"custom:xiaoxiao\"$' "$skin_config")" == "1" ]]
-[[ "$(rg -c '^\[desktop\.appearanceDarkChromeTheme\]$' "$skin_config")" == "1" ]]
+grep -q '^model = "keep-me"$' "$skin_config"
+grep -q '^untouched = "still-here"$' "$skin_config"
+grep -q '^key = "value"$' "$skin_config"
+[[ "$(grep -c '^selected-avatar-id = \"custom:xiaoxiao\"$' "$skin_config")" == "1" ]]
+[[ "$(grep -c '^\[desktop\.appearanceDarkChromeTheme\]$' "$skin_config")" == "1" ]]
 echo "Codex skin config: idempotent, unrelated settings preserved, mode 600."
