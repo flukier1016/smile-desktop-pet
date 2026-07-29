@@ -48,6 +48,7 @@ final class PetController: NSObject {
     private var clickThrough = false
     private var awarenessEngine: AwarenessEngine!
     private var controlCenter: ControlCenterController?
+    private let companionStore = CompanionStore()
     private var currentScene: PetScene = .companion
     private var lastAwarenessSnapshot: AwarenessSnapshot?
 
@@ -80,6 +81,7 @@ final class PetController: NSObject {
         )
 
         awarenessEngine.start()
+        showFirstRunCompanionWelcomeIfNeeded()
     }
 
     private func makePanel() {
@@ -129,6 +131,14 @@ final class PetController: NSObject {
 
         let menu = NSMenu()
         addMenuItem("✨ 打开控制中心…", action: #selector(showControlCenter), to: menu)
+        let companionItem = NSMenuItem(
+            title: companionMenuTitle(),
+            action: #selector(showControlCenter),
+            keyEquivalent: ""
+        )
+        companionItem.target = self
+        companionItem.tag = 401
+        menu.addItem(companionItem)
         menu.addItem(.separator())
         addMenuItem("👋 叫她回来", action: #selector(bringBack), to: menu)
         addMenuItem("💬 让她说句话", action: #selector(saySomething), to: menu)
@@ -165,9 +175,23 @@ final class PetController: NSObject {
         menu.addItem(item)
     }
 
+    private func companionMenuTitle() -> String {
+        let progress = companionStore.snapshot()
+        return "♥︎ Lv.\(progress.level) \(progress.levelTitle) · 今日 "
+            + "\(progress.completedCareCount)/\(progress.careGoal)"
+    }
+
     func contextualMenu() -> NSMenu {
         let menu = NSMenu()
         addMenuItem("✨ 打开控制中心…", action: #selector(showControlCenter), to: menu)
+        let companionItem = NSMenuItem(
+            title: companionMenuTitle(),
+            action: #selector(showControlCenter),
+            keyEquivalent: ""
+        )
+        companionItem.target = self
+        companionItem.tag = 401
+        menu.addItem(companionItem)
         menu.addItem(.separator())
         addMenuItem("🍪 喂她一口", action: #selector(feed), to: menu)
         addMenuItem("✨ 夸夸她", action: #selector(praise), to: menu)
@@ -329,15 +353,7 @@ final class PetController: NSObject {
         }
 
         if point.y > 185 {
-            let phrases = [
-                "嘿嘿，再摸一下～",
-                "摸头成功！好感度 +1",
-                "头发不要摸乱啦！",
-                "被你抓到啦 ♥︎",
-                "再摸就要收费啦～"
-            ]
-            petView.showMessage(phrases.randomElement()!, duration: 3)
-            petView.patReaction()
+            pat()
         } else {
             let phrases = [
                 "痒痒痒！",
@@ -346,14 +362,24 @@ final class PetController: NSObject {
                 "我弹回来了！",
                 "今天也元气满满！"
             ]
-            petView.showMessage(phrases.randomElement()!, duration: 3)
+            let update = recordCompanion(.poke)
+            showInteractionMessage(
+                phrases.randomElement()!,
+                update: update,
+                duration: 3
+            )
             petView.bounce()
+            playSound(named: "Pop")
         }
-        playSound(named: "Pop")
     }
 
     func doubleTapped() {
-        petView.showMessage("快乐加载到 100%！", duration: 3)
+        let update = recordCompanion(.celebrate)
+        showInteractionMessage(
+            "快乐加载到 100%！",
+            update: update,
+            duration: 3
+        )
         petView.party()
         playSound(named: "Glass")
     }
@@ -500,6 +526,10 @@ final class PetController: NSObject {
     }
 
     @objc private func showControlCenter() {
+        presentControlCenter(preferCompanionPage: false)
+    }
+
+    private func presentControlCenter(preferCompanionPage: Bool) {
         if controlCenter == nil {
             let controller = ControlCenterController()
             controller.onAwarenessChanged = { [weak self] enabled in
@@ -523,9 +553,30 @@ final class PetController: NSObject {
             controller.onPrivacy = { [weak self] in
                 self?.showAwarenessPrivacy()
             }
+            controller.onPat = { [weak self] in
+                self?.pat()
+            }
+            controller.onFeed = { [weak self] in
+                self?.feed()
+            }
+            controller.onPraise = { [weak self] in
+                self?.praise()
+            }
+            controller.onFortune = { [weak self] in
+                self?.fortune()
+            }
+            controller.onWalk = { [weak self] in
+                self?.takeAWalk()
+            }
+            controller.onCelebrate = { [weak self] in
+                self?.doubleTapped()
+            }
             controlCenter = controller
         }
-        controlCenter?.show(state: makeControlCenterState())
+        controlCenter?.show(
+            state: makeControlCenterState(),
+            preferCompanionPage: preferCompanionPage
+        )
     }
 
     private func makeControlCenterState() -> ControlCenterState {
@@ -550,8 +601,25 @@ final class PetController: NSObject {
             hasScreenPermission: awarenessEngine.hasScreenCapturePermission,
             isPaused: awarenessEngine.isPaused || awarenessEngine.selectedManualScene != nil,
             scale: petScale,
-            ocrInterval: awarenessEngine.ocrInterval
+            ocrInterval: awarenessEngine.ocrInterval,
+            companion: companionStore.snapshot()
         )
+    }
+
+    private func showFirstRunCompanionWelcomeIfNeeded() {
+        let defaults = UserDefaults.standard
+        let key = "didShowCompanionWelcomeV140"
+        guard !defaults.bool(forKey: key) else { return }
+        defaults.set(true, forKey: key)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) { [weak self] in
+            guard let self else { return }
+            self.presentControlCenter(preferCompanionPage: true)
+            self.petView.showMessage(
+                "以后每天来摸摸、喂食、夸夸、抽签，我会慢慢长大～",
+                duration: 6
+            )
+            self.petView.celebrate(symbols: ["♥︎", "✨", "🌸"], count: 16)
+        }
     }
 
     @objc private func refreshAwareness() {
@@ -652,10 +720,33 @@ final class PetController: NSObject {
         }
     }
 
+    @objc func pat() {
+        let phrases = [
+            "嘿嘿，再摸一下～",
+            "摸头成功！陪伴值上升。",
+            "头发不要摸乱啦！",
+            "被你抓到啦 ♥︎",
+            "今日份摸摸收到～"
+        ]
+        let update = recordCompanion(.pat)
+        showInteractionMessage(
+            phrases.randomElement()!,
+            update: update,
+            duration: 3.6
+        )
+        petView.patReaction()
+        playSound(named: "Pop")
+    }
+
     @objc func feed() {
         let foods = ["🍪", "🍓", "🍡", "🥟", "🍰"]
         let food = foods.randomElement()!
-        petView.showMessage("\(food) 嗷呜！这口算你的～", duration: 3.5)
+        let update = recordCompanion(.feed)
+        showInteractionMessage(
+            "\(food) 嗷呜！这口算你的～",
+            update: update,
+            duration: 3.8
+        )
         petView.feed(with: food)
         playSound(named: "Tink")
     }
@@ -667,21 +758,23 @@ final class PetController: NSObject {
             "嘿嘿，我也觉得我超可爱！",
             "这句我先收藏了 ♥︎"
         ]
-        petView.showMessage(phrases.randomElement()!, duration: 3.5)
+        let update = recordCompanion(.praise)
+        showInteractionMessage(
+            phrases.randomElement()!,
+            update: update,
+            duration: 3.8
+        )
         petView.celebrate(symbols: ["♥︎", "✨", "✦"], count: 14)
         petView.wiggle()
     }
 
     @objc func fortune() {
-        let fortunes = [
-            "今日宜：大胆一点，运气会接住你。",
-            "今日宜：喝水；忌：空腹硬撑。",
-            "今日好运藏在下一次点击里 ✨",
-            "今天会有一个小惊喜主动找你。",
-            "幸运色：红色。幸运动作：伸懒腰。",
-            "今日宜：把最难的事先做五分钟。"
-        ]
-        petView.showMessage(fortunes.randomElement()!, duration: 5)
+        let update = recordCompanion(.fortune)
+        showInteractionMessage(
+            CompanionDailyContent.fortune(),
+            update: update,
+            duration: 6
+        )
         petView.celebrate(symbols: ["✦", "☀︎", "✨"], count: 12)
     }
 
@@ -694,7 +787,12 @@ final class PetController: NSObject {
         let targetY = CGFloat.random(
             in: visible.minY...(visible.maxY - panel.frame.height)
         )
-        petView.showMessage("出发！换个地方摸鱼～", duration: 3)
+        let update = recordCompanion(.walk)
+        showInteractionMessage(
+            "出发！换个地方摸鱼～",
+            update: update,
+            duration: 3.5
+        )
         petView.walking = true
         NSAnimationContext.runAnimationGroup { context in
             context.duration = 1.4
@@ -703,6 +801,41 @@ final class PetController: NSObject {
         } completionHandler: { [weak self] in
             self?.petView.walking = false
             self?.savePosition()
+        }
+    }
+
+    @discardableResult
+    private func recordCompanion(_ action: CompanionAction) -> CompanionUpdate {
+        let update = companionStore.record(action)
+        updateMenuStates()
+        return update
+    }
+
+    private func showInteractionMessage(
+        _ regularMessage: String,
+        update: CompanionUpdate,
+        duration: TimeInterval
+    ) {
+        if update.didLevelUp {
+            petView.showMessage(
+                "升级啦！Lv.\(update.after.level) · \(update.after.levelTitle) ✨",
+                duration: 5
+            )
+            petView.party()
+        } else if update.didCompleteDailyCare {
+            petView.showMessage(
+                "今日照顾全部完成！连续 \(update.after.streak) 天 🔥",
+                duration: 5
+            )
+            petView.party()
+        } else if update.isFirstCareToday {
+            petView.showMessage(
+                "\(regularMessage)  今日 \(update.after.completedCareCount)"
+                    + "/\(update.after.careGoal) ✓",
+                duration: duration
+            )
+        } else {
+            petView.showMessage(regularMessage, duration: duration)
         }
     }
 
@@ -782,6 +915,7 @@ final class PetController: NSObject {
         findMenuItem(tag: 311, in: menu)?.state = abs(awarenessEngine.ocrInterval - 8) < 0.5 ? .on : .off
         findMenuItem(tag: 312, in: menu)?.state = abs(awarenessEngine.ocrInterval - 15) < 0.5 ? .on : .off
         findMenuItem(tag: 313, in: menu)?.state = abs(awarenessEngine.ocrInterval - 30) < 0.5 ? .on : .off
+        findMenuItem(tag: 401, in: menu)?.title = companionMenuTitle()
         controlCenter?.update(makeControlCenterState())
     }
 
@@ -879,6 +1013,14 @@ final class PetView: NSView {
         super.init(frame: frameRect)
         wantsLayer = true
         layer?.backgroundColor = NSColor.clear.cgColor
+        setAccessibilityElement(true)
+        setAccessibilityRole(.button)
+        setAccessibilityLabel("笑笑桌宠")
+        setAccessibilityValue(scene.title)
+        setAccessibilityHelp(
+            "按下可摸摸，双击可庆祝，拖动可换位置，右键打开互动菜单"
+        )
+        setAccessibilityIdentifier("smile-desktop-pet")
 
         animationTimer = Timer(
             timeInterval: 1.0 / 30.0,
@@ -988,6 +1130,12 @@ final class PetView: NSView {
         if now < patEndsAt {
             scale += 0.035 + sin(CGFloat(now * 24)) * 0.018
             rect.size.height *= 0.97
+        }
+
+        if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+            verticalOffset = 0
+            rotation = 0
+            scale = 1
         }
 
         rect.origin.y += verticalOffset
@@ -1248,6 +1396,7 @@ final class PetView: NSView {
 
     func setScene(_ newScene: PetScene) {
         scene = newScene
+        setAccessibilityValue(newScene.title)
         needsDisplay = true
     }
 
@@ -1279,6 +1428,9 @@ final class PetView: NSView {
         count: Int,
         origin: NSPoint? = nil
     ) {
+        guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
+            return
+        }
         let now = ProcessInfo.processInfo.systemUptime
         let center = origin ?? NSPoint(x: logicalSize.width / 2, y: 225)
         for _ in 0..<count {
@@ -1349,6 +1501,11 @@ final class PetView: NSView {
     override func rightMouseDown(with event: NSEvent) {
         guard let menu = controller?.contextualMenu() else { return }
         NSMenu.popUpContextMenu(menu, with: event, for: self)
+    }
+
+    override func accessibilityPerformPress() -> Bool {
+        controller?.pat()
+        return true
     }
 
     private var displayScale: CGFloat {

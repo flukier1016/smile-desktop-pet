@@ -1,0 +1,8 @@
+model = "keep-me"
+
+[desktop]
+appearanceTheme = "light"
+untouched = "still-here"
+
+[unrelated]
+key = "value"
