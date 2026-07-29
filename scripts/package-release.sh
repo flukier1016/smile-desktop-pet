@@ -2,7 +2,7 @@
 set -euo pipefail
 
 PROJECT_DIR="${0:A:h:h}"
-VERSION="${1:-1.2.0}"
+VERSION="${1:-1.3.0}"
 APP_NAME="笑笑桌宠"
 DIST_DIR="$PROJECT_DIR/dist"
 STAGE_DIR="$DIST_DIR/$APP_NAME-v$VERSION"
@@ -15,6 +15,14 @@ if [[ ! "$VERSION" =~ '^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$' ]]; then
   exit 1
 fi
 
+PLIST_VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$PROJECT_DIR/Info.plist")
+if [[ "$PLIST_VERSION" != "$VERSION" ]]; then
+  echo "Version mismatch: Info.plist=$PLIST_VERSION requested=$VERSION" >&2
+  exit 1
+fi
+
+"$PROJECT_DIR/scripts/security-check.sh"
+"$PROJECT_DIR/scripts/test.sh"
 "$PROJECT_DIR/build.sh"
 mkdir -p "$DIST_DIR"
 
@@ -24,6 +32,9 @@ fi
 mkdir -p "$STAGE_DIR"
 cp -R "$PROJECT_DIR/$APP_NAME.app" "$STAGE_DIR/"
 cp "$PROJECT_DIR/开始使用.txt" "$STAGE_DIR/"
+cp "$PROJECT_DIR/MANUAL.md" "$STAGE_DIR/用户使用手册.md"
+cp "$PROJECT_DIR/PRIVACY.md" "$STAGE_DIR/隐私说明.md"
+cp "$PROJECT_DIR/LICENSE" "$STAGE_DIR/LICENSE.txt"
 ln -s /Applications "$STAGE_DIR/Applications"
 
 rm -f "$ZIP_PATH" "$DMG_PATH" "$CHECKSUM_PATH"
@@ -39,6 +50,8 @@ hdiutil create \
   cd "$DIST_DIR"
   shasum -a 256 "${ZIP_PATH:t}" "${DMG_PATH:t}" > "${CHECKSUM_PATH:t}"
 )
+
+rm -r "$STAGE_DIR"
 
 echo "Release artifacts:"
 ls -lh "$ZIP_PATH" "$DMG_PATH" "$CHECKSUM_PATH"
