@@ -24,7 +24,7 @@ jobs:
         uses: github/codeql-action/init@4187e74d05793876e9989daffde9c3e66b4acd07 # v3.37.3
         with:
           languages: swift
-      - name: Build universal app
-        run: ./build.sh
+      - name: Build once for analysis
+        run: ./scripts/codeql-build.sh
       - name: Analyze
         uses: github/codeql-action/analyze@4187e74d05793876e9989daffde9c3e66b4acd07 # v3.37.3
