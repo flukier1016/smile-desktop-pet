@@ -64,7 +64,7 @@ function cacheControl(pathname) {
     return 'public, max-age=31536000, immutable'
   }
   if (pathname.endsWith('.html')) {
-    return 'public, max-age=0, s-maxage=3600, stale-while-revalidate=86400'
+    return 'public, max-age=60, s-maxage=3600, stale-while-revalidate=86400'
   }
   return 'public, max-age=86400'
 }
@@ -138,6 +138,11 @@ const server = createServer(async (request, response) => {
       ETag: etag,
       'Last-Modified': file.mtime.toUTCString(),
       Vary: 'Accept-Encoding',
+    }
+    if (extension === '.html') {
+      // Railway's edge cache is Fastly-backed. Keep browsers on revalidation
+      // while giving the surrogate a stable one-hour freshness window.
+      headers['Surrogate-Control'] = 'max-age=3600, stale-while-revalidate=86400'
     }
 
     if (requestHasEtag(request, etag)) {
