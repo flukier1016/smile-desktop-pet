@@ -2305,9 +2305,9 @@ main {
   width: 192px;
   height: 208px;
   transform: scale(1.24);
-  background-image: url("/spritesheet.png");
+  background-image: url("/spritesheet.webp");
   background-image: image-set(
-    url("/spritesheet.avif") type("image/avif"),
+    url("/spritesheet.webp") type("image/webp"),
     url("/spritesheet.png") type("image/png")
   );
   background-repeat: no-repeat;

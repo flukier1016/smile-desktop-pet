@@ -202,11 +202,12 @@ function HeroStage({ sceneIndex }: { sceneIndex: number }) {
         <div className="pet-shadow" aria-hidden="true" />
         <img
           className="hero-pet"
-          src="/xiaoxiao.png"
+          src="/xiaoxiao.webp"
           alt="笑笑桌宠，穿着白色绒衣微笑奔跑"
           width="799"
           height="1181"
           fetchPriority="high"
+          decoding="async"
         />
 
         <div className="speech-bubble" aria-live="polite">
@@ -700,11 +701,12 @@ function App() {
         <div className="final-orbit orbit-b" aria-hidden="true" />
         <img
           className="final-pet"
-          src="/xiaoxiao.png"
+          src="/xiaoxiao.webp"
           alt=""
           width="799"
           height="1181"
           loading="lazy"
+          decoding="async"
         />
         <div className="final-copy">
           <span className="final-kicker">YOUR MAC DESERVES A LITTLE LIFE.</span>
