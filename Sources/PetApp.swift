@@ -47,6 +47,7 @@ final class PetController: NSObject {
     private var quietUntil: Date?
     private var clickThrough = false
     private var awarenessEngine: AwarenessEngine!
+    private var controlCenter: ControlCenterController?
     private var currentScene: PetScene = .companion
     private var lastAwarenessSnapshot: AwarenessSnapshot?
 
@@ -127,6 +128,8 @@ final class PetController: NSObject {
         }
 
         let menu = NSMenu()
+        addMenuItem("✨ 打开控制中心…", action: #selector(showControlCenter), to: menu)
+        menu.addItem(.separator())
         addMenuItem("👋 叫她回来", action: #selector(bringBack), to: menu)
         addMenuItem("💬 让她说句话", action: #selector(saySomething), to: menu)
         addSizeSubmenu(to: menu)
@@ -164,6 +167,8 @@ final class PetController: NSObject {
 
     func contextualMenu() -> NSMenu {
         let menu = NSMenu()
+        addMenuItem("✨ 打开控制中心…", action: #selector(showControlCenter), to: menu)
+        menu.addItem(.separator())
         addMenuItem("🍪 喂她一口", action: #selector(feed), to: menu)
         addMenuItem("✨ 夸夸她", action: #selector(praise), to: menu)
         addMenuItem("🔮 今日小运气", action: #selector(fortune), to: menu)
@@ -449,7 +454,14 @@ final class PetController: NSObject {
     }
 
     @objc private func toggleAwareness(_ sender: NSMenuItem) {
-        let enabled = !awarenessEngine.isEnabled
+        setAwarenessEnabled(!awarenessEngine.isEnabled)
+    }
+
+    private func setAwarenessEnabled(_ enabled: Bool) {
+        guard awarenessEngine.isEnabled != enabled else {
+            updateMenuStates()
+            return
+        }
         awarenessEngine.setEnabled(enabled)
         if enabled {
             petView.showMessage("自动感知启动，我会看场景变状态～", duration: 4)
@@ -462,7 +474,15 @@ final class PetController: NSObject {
     }
 
     @objc private func toggleScreenOCR(_ sender: NSMenuItem) {
-        if awarenessEngine.isOCREnabled {
+        setScreenOCREnabled(!awarenessEngine.isOCREnabled)
+    }
+
+    private func setScreenOCREnabled(_ enabled: Bool) {
+        guard awarenessEngine.isOCREnabled != enabled else {
+            updateMenuStates()
+            return
+        }
+        if !enabled {
             awarenessEngine.setOCREnabled(false)
             petView.showMessage("屏幕 OCR 已关闭，只看前台 App。", duration: 4)
             updateMenuStates()
@@ -477,6 +497,61 @@ final class PetController: NSObject {
             showScreenPermissionHelp()
         }
         updateMenuStates()
+    }
+
+    @objc private func showControlCenter() {
+        if controlCenter == nil {
+            let controller = ControlCenterController()
+            controller.onAwarenessChanged = { [weak self] enabled in
+                self?.setAwarenessEnabled(enabled)
+            }
+            controller.onOCRChanged = { [weak self] enabled in
+                self?.setScreenOCREnabled(enabled)
+            }
+            controller.onScaleChanged = { [weak self] scale in
+                self?.applyScale(scale)
+            }
+            controller.onIntervalChanged = { [weak self] interval in
+                self?.setOCRInterval(interval)
+            }
+            controller.onRefresh = { [weak self] in
+                self?.refreshAwareness()
+            }
+            controller.onBringBack = { [weak self] in
+                self?.bringBack()
+            }
+            controller.onPrivacy = { [weak self] in
+                self?.showAwarenessPrivacy()
+            }
+            controlCenter = controller
+        }
+        controlCenter?.show(state: makeControlCenterState())
+    }
+
+    private func makeControlCenterState() -> ControlCenterState {
+        let snapshot = lastAwarenessSnapshot
+        let foregroundApp = snapshot.flatMap {
+            $0.appName.isEmpty ? nil : $0.appName
+        } ?? "等待识别"
+        let source: String
+        if awarenessEngine.isOCREnabled && !awarenessEngine.hasScreenCapturePermission {
+            source = "OCR 等待权限"
+        } else if let snapshot {
+            source = snapshot.sourceLabel
+        } else {
+            source = awarenessEngine.isOCREnabled ? "等待本地 OCR" : "前台 App"
+        }
+        return ControlCenterState(
+            scene: currentScene,
+            appName: foregroundApp,
+            source: source,
+            awarenessEnabled: awarenessEngine.isEnabled,
+            ocrEnabled: awarenessEngine.isOCREnabled,
+            hasScreenPermission: awarenessEngine.hasScreenCapturePermission,
+            isPaused: awarenessEngine.isPaused || awarenessEngine.selectedManualScene != nil,
+            scale: petScale,
+            ocrInterval: awarenessEngine.ocrInterval
+        )
     }
 
     @objc private func refreshAwareness() {
@@ -639,7 +714,19 @@ final class PetController: NSObject {
     }
 
     @objc func bringBack() {
-        constrainToVisibleScreen()
+        let mouseLocation = NSEvent.mouseLocation
+        let targetScreen = NSScreen.screens.first(where: {
+            NSMouseInRect(mouseLocation, $0.frame, false)
+        }) ?? NSScreen.main
+        if let visible = targetScreen?.visibleFrame {
+            panel.setFrameOrigin(NSPoint(
+                x: visible.maxX - panel.frame.width - 24,
+                y: visible.minY + 20
+            ))
+            savePosition()
+        } else {
+            constrainToVisibleScreen()
+        }
         panel.orderFrontRegardless()
         petView.showMessage("我回来啦！", duration: 3)
         petView.bounce()
@@ -695,6 +782,7 @@ final class PetController: NSObject {
         findMenuItem(tag: 311, in: menu)?.state = abs(awarenessEngine.ocrInterval - 8) < 0.5 ? .on : .off
         findMenuItem(tag: 312, in: menu)?.state = abs(awarenessEngine.ocrInterval - 15) < 0.5 ? .on : .off
         findMenuItem(tag: 313, in: menu)?.state = abs(awarenessEngine.ocrInterval - 30) < 0.5 ? .on : .off
+        controlCenter?.update(makeControlCenterState())
     }
 
     private func findMenuItem(tag: Int, in menu: NSMenu) -> NSMenuItem? {
@@ -1008,14 +1096,26 @@ final class PetView: NSView {
     private func drawSceneBadge() {
         guard message == nil else { return }
         let badgeRect = NSRect(x: 69, y: 376, width: 182, height: 32)
+        let badge = NSBezierPath(roundedRect: badgeRect, xRadius: 16, yRadius: 16)
+        NSGraphicsContext.current?.saveGraphicsState()
         let shadow = NSShadow()
         shadow.shadowColor = NSColor.black.withAlphaComponent(0.18)
         shadow.shadowBlurRadius = 7
         shadow.shadowOffset = NSSize(width: 0, height: -2)
         shadow.set()
 
-        scene.accentColor.withAlphaComponent(0.94).setFill()
-        NSBezierPath(roundedRect: badgeRect, xRadius: 16, yRadius: 16).fill()
+        let highlight = scene.accentColor.blended(
+            withFraction: 0.22,
+            of: .white
+        ) ?? scene.accentColor
+        NSGradient(
+            starting: highlight.withAlphaComponent(0.97),
+            ending: scene.accentColor.withAlphaComponent(0.97)
+        )?.draw(in: badge, angle: 0)
+        NSColor.white.withAlphaComponent(0.32).setStroke()
+        badge.lineWidth = 1
+        badge.stroke()
+        NSGraphicsContext.current?.restoreGraphicsState()
 
         NSGraphicsContext.current?.saveGraphicsState()
         let paragraph = NSMutableParagraphStyle()
@@ -1036,23 +1136,45 @@ final class PetView: NSView {
     private func drawBubble() {
         guard let message else { return }
         let bubbleRect = NSRect(x: 8, y: 350, width: logicalSize.width - 16, height: 70)
+        let bubble = NSBezierPath(roundedRect: bubbleRect, xRadius: 20, yRadius: 20)
+        NSGraphicsContext.current?.saveGraphicsState()
         let shadow = NSShadow()
         shadow.shadowColor = NSColor.black.withAlphaComponent(0.18)
         shadow.shadowBlurRadius = 10
         shadow.shadowOffset = NSSize(width: 0, height: -2)
         shadow.set()
 
-        let bubble = NSBezierPath(roundedRect: bubbleRect, xRadius: 18, yRadius: 18)
-        NSColor.white.withAlphaComponent(0.96).setFill()
-        bubble.fill()
+        NSGradient(
+            starting: NSColor.white.withAlphaComponent(0.98),
+            ending: NSColor(calibratedRed: 1.0, green: 0.965, blue: 0.93, alpha: 0.98)
+        )?.draw(in: bubble, angle: -90)
+        scene.accentColor.withAlphaComponent(0.24).setStroke()
+        bubble.lineWidth = 1.2
+        bubble.stroke()
 
         let tail = NSBezierPath()
         tail.move(to: NSPoint(x: bubbleRect.midX - 10, y: bubbleRect.minY + 1))
         tail.line(to: NSPoint(x: bubbleRect.midX + 12, y: bubbleRect.minY + 1))
         tail.line(to: NSPoint(x: bubbleRect.midX + 2, y: bubbleRect.minY - 13))
         tail.close()
-        NSColor.white.withAlphaComponent(0.96).setFill()
+        NSColor(calibratedRed: 1.0, green: 0.965, blue: 0.93, alpha: 0.98).setFill()
         tail.fill()
+        NSGraphicsContext.current?.restoreGraphicsState()
+
+        let iconRect = NSRect(x: bubbleRect.minX + 14, y: bubbleRect.midY - 18, width: 36, height: 36)
+        scene.accentColor.withAlphaComponent(0.12).setFill()
+        NSBezierPath(roundedRect: iconRect, xRadius: 12, yRadius: 12).fill()
+        let iconParagraph = NSMutableParagraphStyle()
+        iconParagraph.alignment = .center
+        let iconAttributes: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: 18),
+            .paragraphStyle: iconParagraph
+        ]
+        (scene.emoji as NSString).draw(
+            with: iconRect.insetBy(dx: 2, dy: 7),
+            options: [.usesLineFragmentOrigin],
+            attributes: iconAttributes
+        )
 
         NSGraphicsContext.current?.saveGraphicsState()
         let paragraph = NSMutableParagraphStyle()
@@ -1063,7 +1185,12 @@ final class PetView: NSView {
             .foregroundColor: NSColor(calibratedRed: 0.20, green: 0.14, blue: 0.13, alpha: 1),
             .paragraphStyle: paragraph
         ]
-        let textRect = bubbleRect.insetBy(dx: 16, dy: 12)
+        let textRect = NSRect(
+            x: iconRect.maxX + 10,
+            y: bubbleRect.minY + 11,
+            width: bubbleRect.maxX - iconRect.maxX - 22,
+            height: bubbleRect.height - 22
+        )
         (message as NSString).draw(
             with: textRect,
             options: [.usesLineFragmentOrigin, .usesFontLeading],

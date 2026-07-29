@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 私密漏洞上报
+    url: https://github.com/flukier1016/smile-desktop-pet/security/advisories/new
+    about: 漏洞、凭据或其他敏感问题请勿公开提交
+  - name: 用户使用手册
+    url: https://github.com/flukier1016/smile-desktop-pet/blob/main/MANUAL.md
+    about: 先查看安装、权限、更新和常见问题

@@ -1,73 +1,120 @@
+<div align="center">
+
+<img src="docs/media/hero.png" alt="笑笑桌宠产品横幅" width="100%">
+
 # 笑笑桌宠
 
-<p align="center">
-  <img src="Assets/pet.png" width="260" alt="笑笑桌宠 Q 版角色">
-</p>
+**会看场景、会接话、也会催你下班的原生 macOS 桌面搭子。**
+
+[下载最新版](../../releases/latest) · [使用手册](MANUAL.md) · [English](README_EN.md) · [参与贡献](CONTRIBUTING.md)
+
+[![Latest release](https://img.shields.io/github/v/release/flukier1016/smile-desktop-pet?display_name=tag&style=flat-square)](../../releases/latest)
+[![Build](https://img.shields.io/github/actions/workflow/status/flukier1016/smile-desktop-pet/build.yml?branch=main&style=flat-square&label=build)](../../actions/workflows/build.yml)
+[![CodeQL](https://img.shields.io/github/actions/workflow/status/flukier1016/smile-desktop-pet/codeql.yml?branch=main&style=flat-square&label=CodeQL)](../../actions/workflows/codeql.yml)
+![macOS 13+](https://img.shields.io/badge/macOS-13%2B-111111?style=flat-square&logo=apple)
+![Offline](https://img.shields.io/badge/privacy-100%25%20local-2f8f78?style=flat-square)
+[![MIT code](https://img.shields.io/badge/code-MIT-c4473d?style=flat-square)](LICENSE)
+
+</div>
+
+## 一眼看懂
+
+笑笑常驻桌面，不占 Dock。她会根据前台 App 和可选的本地 OCR，在写代码、
+报错、测试通过、表格、盯盘、会议、阅读、摸鱼、深夜加班等 **23 种状态**
+间自动切换；所有判断都在本机完成。
+
+- **会互动**：摸头、戳一下、双击庆祝、喂食、夸夸、抽运气、散步。
+- **会感知**：默认只看前台 App；开启 OCR 后可识别当前窗口中的场景线索。
+- **可掌控**：原生控制中心统一管理大小、感知、OCR、识别节奏和隐私状态。
+- **不打扰**：迷你／标准／大只三档，支持 Option 滚轮微调、鼠标穿透和安静模式。
+- **够放心**：无账号、无广告、无遥测、无网络请求，不保存截图或 OCR 文字。
+- **双架构**：一个安装包同时支持 Apple Silicon 与 Intel Mac。
 
 <p align="center">
-  一只会蹦、会接话、会被你喂胖一点点的原生 macOS 桌宠。
+  <img src="docs/media/control-center.png" width="680" alt="笑笑桌宠原生控制中心">
 </p>
 
-## 下载
+## 三分钟上手
 
-打开 [Releases](../../releases/latest)，下载以下任一文件：
+1. 打开 [Releases](../../releases/latest)，下载
+   `SmilePet-v1.3.0-macos-universal.dmg`。
+2. 把“笑笑桌宠”拖到“应用程序”。
+3. 第一次启动时，在 Finder 右键 App，选择“打开”并确认。
+4. 点击菜单栏笑脸或右键桌宠，打开“控制中心”。
 
-- `SmilePet-v1.2.0-macos-universal.dmg`：推荐，打开后把 App 拖到“应用程序”。
-- `SmilePet-v1.2.0-macos-universal.zip`：解压后直接运行。
-- `SHA256SUMS.txt`：用于校验下载文件是否完整。
+当前 Release 使用临时签名，尚未 Apple 公证。请只从本仓库官方 Release 下载，
+并可用同页的 `SHA256SUMS.txt` 校验文件。完整步骤见 [用户使用手册](MANUAL.md)。
 
-支持 macOS 13 或更高版本，同时兼容 Apple Silicon 和 Intel Mac。
+## 她会变成什么
 
-> 当前版本使用临时签名，尚未进行 Apple 公证。第一次启动时，请在 Finder 中右键“笑笑桌宠”，选择“打开”，再确认一次。不要使用来源不明的二次打包版本。
+| 现场 | 状态示例 | 反应 |
+| --- | --- | --- |
+| 开发 | 写代码、报错、测试通过 | 专注、抢救、撒花 |
+| 办公 | 表格、写作、汇报、邮件 | 公式提醒、行动项、清零 |
+| 金融与研究 | 盯盘、阅读、资料检索 | 风险提醒、来源检查 |
+| 沟通与创作 | 会议、消息、设计 | 静音、守红点、灵感施工 |
+| 生活 | 视频、音乐、游戏、购物 | 摸鱼、摇摆、冷静十分钟 |
+| 节奏 | 长时间工作、离开、深夜 | 工位服刑、守桌面、催下班 |
 
-## 好玩的地方
+全部状态、识别条件和权限说明见 [用户使用手册](MANUAL.md#6-场景感知)。
 
-- 单击头部：摸摸头，随机回应并冒爱心。
-- 单击身体：戳一下，她会弹跳反击。
-- 双击：旋转、撒彩带，快乐加载到 100%。
-- 拖拽：把她放到屏幕任意位置，下次启动会记住。
-- 调整大小：右键或菜单栏选择迷你／标准／大只；按住 `Option` 滚轮可连续缩放。
-- 自动感知：根据当前前台 App，在写代码、表格、盯盘、阅读、会议、摸鱼等 23 种状态间切换。
-- 本地 OCR：可选识别当前窗口中的文字，自动发现报错、测试通过、视频、论文、购物等更细场景。
-- 状态演出：每种状态有独立颜色、动作、漂浮符号、道具和台词，还可从菜单手动预览。
-- 右键：喂零食、夸夸、抽今日运气、出去散步、暂时躲起来。
-- 菜单栏笑脸：随时召回、开启鼠标穿透、安静十分钟或退出。
-- 自动碎碎念：喝水提醒、摸鱼批准、随机小剧场。
+## 隐私边界
 
-## 隐私
+```text
+默认模式       前台 App 名称 / Bundle ID  →  本地分类  →  状态
+可选 OCR       当前前台窗口截图            →  Vision 内存识别  →  状态
+不会发生       保存截图 / 保存文字 / 上传 / 遥测 / 广告
+```
 
-笑笑桌宠完全离线运行，不联网，不含分析统计。默认感知只读取前台 App 名称；可选的本地 OCR 需要屏幕录制权限，但只截取当前前台窗口并在内存中识别，不保存截图或文字。详见 [PRIVACY.md](PRIVACY.md)。
+OCR 默认关闭，只有用户主动开启后才请求屏幕录制权限。随时可以在控制中心关闭，
+或在系统设置中撤销权限。详见 [PRIVACY.md](PRIVACY.md) 与
+[SECURITY.md](SECURITY.md)。
 
-## 完整使用说明
+## Codex 笑笑皮肤
 
-安装、首次打开、菜单功能、开机启动、更新、卸载及常见问题均在 [用户使用手册](MANUAL.md) 中说明。Release 安装包也附带一份 `开始使用.txt`。
+仓库附带一套 Codex 原生皮肤：88 帧笑笑桌宠、明暗界面配色和匹配的代码主题。
+它使用 Codex 官方自定义桌宠与主题配置，不修改官方 App 包和签名。
+
+```bash
+./scripts/install-codex-skin.sh
+```
+
+安装前会自动备份 `~/.codex/config.toml`，需要恢复时运行
+`./scripts/uninstall-codex-skin.sh`。详情见 [CodexSkin/README.md](CodexSkin/README.md)。
 
 ## 从源码构建
-
-仅开发者需要这一步：
 
 ```bash
 xcode-select --install
 git clone https://github.com/flukier1016/smile-desktop-pet.git
 cd smile-desktop-pet
+./scripts/security-check.sh
+./scripts/test.sh
 ./build.sh
 open "笑笑桌宠.app"
 ```
 
-构建脚本会生成 Apple Silicon＋Intel 通用 App，并进行本地临时签名。
-
-打 Release 包：
+生成的是 macOS 13+、Apple Silicon＋Intel 通用、临时签名的原生 App。
+打包 Release：
 
 ```bash
-./scripts/package-release.sh 1.2.0
+./scripts/package-release.sh 1.3.0
 ```
 
-产物位于 `dist/`。
+## 开源与参与
 
-## 许可
+- Swift 源代码、文档和构建工具采用 [MIT License](LICENSE)。
+- 角色图片、图标、Codex 精灵图及其派生素材不在 MIT 授权范围内，详见
+  [ASSET_NOTICE.md](ASSET_NOTICE.md)。
+- 原始人物照片从未提交到仓库、CI 或 Release。
+- Bug、功能建议和首次贡献请从 [Issues](../../issues) 开始；安全问题请使用
+  [私密漏洞上报](../../security/advisories/new)。
+- 开发规范、测试要求和素材边界见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
-- Swift 源代码采用 [MIT License](LICENSE)。
-- `Assets/pet.png`、`Assets/AppIcon.icns` 及其角色形象不在 MIT 授权范围内，详见 [ASSET_NOTICE.md](ASSET_NOTICE.md)。
-- 原始人物照片从未提交到本仓库或 Release。
+## 当前路线
 
-发现问题或有新玩法建议，欢迎提交 [Issue](../../issues)。
+- Apple Developer ID 签名与公证。
+- 更多社区场景规则和可替换角色包。
+- 更完整的能耗与辅助功能验收。
+
+喜欢这个项目，可以点一个 Star、分享 Release，或贡献一条新的场景台词。

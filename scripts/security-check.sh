@@ -1,0 +1,70 @@
+#!/bin/zsh
+set -euo pipefail
+
+PROJECT_DIR="${0:A:h:h}"
+cd "$PROJECT_DIR"
+
+failed=0
+while IFS= read -r -d '' tracked_path; do
+  case "$tracked_path" in
+    .env|*/.env|.env.*|*/.env.*|*.pem|*.key|*.p12|*.pfx|*.mobileprovision)
+      echo "Forbidden sensitive file: $tracked_path" >&2
+      failed=1
+      ;;
+    *.jpg|*.jpeg|*.heic|Assets/original*)
+      echo "Potential source photo must not be tracked: $tracked_path" >&2
+      failed=1
+      ;;
+  esac
+
+  if [[ -f "$tracked_path" ]]; then
+    size=$(stat -f %z "$tracked_path")
+    if (( size > 12582912 )); then
+      echo "Tracked file exceeds 12 MiB: $tracked_path" >&2
+      failed=1
+    fi
+  fi
+done < <(git ls-files -z --cached --others --exclude-standard)
+
+if (( failed != 0 )); then
+  exit 1
+fi
+
+scan_args=(
+  --hidden
+  --line-number
+  --ignore-case
+  --glob '!scripts/security-check.sh'
+  --glob '!*.png'
+  --glob '!*.icns'
+  --glob '!*.dmg'
+  --glob '!*.zip'
+  --glob '!笑笑桌宠.app/**'
+  --glob '!dist/**'
+)
+github_pattern='github'_'pat_[A-Za-z0-9_]{40,}|gh[pousr]_[A-Za-z0-9]{30,}'
+openai_prefix='sk-'
+openai_pattern="${openai_prefix}(?:proj-|live-)?[A-Za-z0-9_-]{24,}"
+private_key_pattern='-----BEGIN[[:space:]][A-Z0-9[:space:]]*PRIVATE[[:space:]]KEY-----'
+
+if rg "${scan_args[@]}" \
+  -e "$github_pattern" \
+  -e "$openai_pattern" \
+  -e "$private_key_pattern" \
+  .; then
+  echo "Possible credential or private key found." >&2
+  exit 1
+fi
+
+network_pattern='URLSession|NWConnection|NWPathMonitor|CFNetwork|WebSocket|import[[:space:]]+Network'
+if rg --line-number -e "$network_pattern" Sources; then
+  echo "Network API found in app sources; update privacy and security review first." >&2
+  exit 1
+fi
+
+for script in build.sh scripts/*.sh; do
+  zsh -n "$script"
+done
+
+plutil -lint Info.plist >/dev/null
+echo "Security check passed: no tracked secrets, source photos, or app network APIs."
