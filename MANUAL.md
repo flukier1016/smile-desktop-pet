@@ -1,6 +1,6 @@
 # 笑笑桌宠用户使用手册
 
-版本：1.4.0
+版本：1.4.1
 适用系统：macOS 13 Ventura 或更高版本
 适用设备：Apple Silicon 与 Intel Mac
 
@@ -8,14 +8,14 @@
 
 ### 推荐：DMG
 
-1. 在 GitHub Releases 下载 `SmilePet-v1.4.0-macos-universal.dmg`。
+1. 在 GitHub Releases 下载 `SmilePet-v1.4.1-macos-universal.dmg`。
 2. 双击打开 DMG。
 3. 把“笑笑桌宠”拖到“应用程序”文件夹。
 4. 推出 DMG。
 
 ### 备用：ZIP
 
-1. 下载 `SmilePet-v1.4.0-macos-universal.zip`。
+1. 下载 `SmilePet-v1.4.1-macos-universal.zip`。
 2. 双击解压。
 3. 把“笑笑桌宠”拖到“应用程序”文件夹。
 
@@ -56,7 +56,7 @@
 
 ## 4. 每日陪伴与成长
 
-第一次启动 v1.4.0 时会自动打开控制中心的“陪伴”页。以后点击菜单栏笑脸、
+第一次启动 v1.4.1 时会自动打开控制中心的“陪伴”页。以后点击菜单栏笑脸、
 右键桌宠，或点击动态等级菜单项，都可以再次打开。
 
 “陪伴”页有 6 个直接互动按钮：

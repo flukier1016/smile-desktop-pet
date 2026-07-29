@@ -3,6 +3,8 @@
 MIT License 仅适用于本仓库中的源代码和文档，不适用于以下角色素材：
 
 - `Assets/pet.png`
+- `Assets/AppIconSource.png`
+- `Assets/AppIconMaster.png`
 - `Assets/AppIcon.icns`
 - 从上述文件派生的角色图像、图标和 Release 内嵌资源
 
@@ -11,6 +13,8 @@ MIT License 仅适用于本仓库中的源代码和文档，不适用于以下�
 - `CodexSkin/spritesheet.png`
 - `CodexSkin/source-green.png`
 - `docs/media/hero.png`
+- `docs/media/app-icon.png`
+- `smilepet-landing/public/` 中的角色、图标、精灵图与分享图
 - README、截图及 Release 中出现的角色派生图像
 
 这些角色素材随笑笑桌宠 App 和 Codex 皮肤提供，仅供终端用户按原样使用。
