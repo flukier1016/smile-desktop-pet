@@ -18,6 +18,9 @@ importers:
         specifier: ^19.2.7
         version: 19.2.8(react@19.2.8)
     devDependencies:
+      '@types/node':
+        specifier: ^24.13.2
+        version: 24.13.3
       '@types/react':
         specifier: ^19.2.17
         version: 19.2.17
@@ -1001,7 +1004,6 @@ snapshots:
   '@types/node@24.13.3':
     dependencies:
       undici-types: 7.18.2
-    optional: true
 
   '@types/react-dom@19.2.3(@types/react@19.2.17)':
     dependencies:
@@ -1412,8 +1414,7 @@ snapshots:
 
   typescript@6.0.3: {}
 
-  undici-types@7.18.2:
-    optional: true
+  undici-types@7.18.2: {}
 
   update-browserslist-db@1.2.3(browserslist@4.28.7):
     dependencies:
