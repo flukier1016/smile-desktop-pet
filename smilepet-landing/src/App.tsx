@@ -200,17 +200,14 @@ function HeroStage({ sceneIndex }: { sceneIndex: number }) {
         </div>
 
         <div className="pet-shadow" aria-hidden="true" />
-        <picture>
-          <source srcSet="/xiaoxiao.avif" type="image/avif" />
-          <img
-            className="hero-pet"
-            src="/xiaoxiao.png"
-            alt="笑笑桌宠，穿着白色绒衣微笑奔跑"
-            width="799"
-            height="1181"
-            fetchPriority="high"
-          />
-        </picture>
+        <img
+          className="hero-pet"
+          src="/xiaoxiao.png"
+          alt="笑笑桌宠，穿着白色绒衣微笑奔跑"
+          width="799"
+          height="1181"
+          fetchPriority="high"
+        />
 
         <div className="speech-bubble" aria-live="polite">
           <span>{scene.title}</span>
@@ -701,17 +698,14 @@ function App() {
       <section className="final-section">
         <div className="final-orbit orbit-a" aria-hidden="true" />
         <div className="final-orbit orbit-b" aria-hidden="true" />
-        <picture>
-          <source srcSet="/xiaoxiao.avif" type="image/avif" />
-          <img
-            className="final-pet"
-            src="/xiaoxiao.png"
-            alt=""
-            width="799"
-            height="1181"
-            loading="lazy"
-          />
-        </picture>
+        <img
+          className="final-pet"
+          src="/xiaoxiao.png"
+          alt=""
+          width="799"
+          height="1181"
+          loading="lazy"
+        />
         <div className="final-copy">
           <span className="final-kicker">YOUR MAC DESERVES A LITTLE LIFE.</span>
           <h2>把笑笑<br />带回桌面。</h2>
