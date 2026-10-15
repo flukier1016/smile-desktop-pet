@@ -10,7 +10,7 @@ body:
   - type: input
     id: version
     attributes:
-      label: 笑笑桌宠版本
+      label: 肉鱼桌宠版本
       placeholder: 例如 1.3.0
     validations:
       required: true

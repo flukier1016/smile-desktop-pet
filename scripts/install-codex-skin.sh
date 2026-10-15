@@ -60,6 +60,6 @@ install -m 0644 "$PROJECT_DIR/CodexSkin/pet.json" "$PET_DIR/pet.json"
 xcrun swift "$PROJECT_DIR/Tools/apply_codex_skin.swift" "$CODEX_CONFIG"
 chmod 600 "$CODEX_CONFIG"
 
-echo "Installed Codex skin: 笑笑"
+echo "Installed Codex skin: 肉鱼"
 echo "Backup: $backup_path"
 echo "Restart Codex if the pet does not refresh immediately."

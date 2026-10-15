@@ -23,7 +23,7 @@ jobs:
         run: ./build.sh
       - name: Verify bundle
         run: |
-          plutil -lint "笑笑桌宠.app/Contents/Info.plist"
-          codesign --verify --deep --strict "笑笑桌宠.app"
-          test "$(lipo -archs "笑笑桌宠.app/Contents/MacOS/SmilePet")" = "x86_64 arm64" \
-            || test "$(lipo -archs "笑笑桌宠.app/Contents/MacOS/SmilePet")" = "arm64 x86_64"
+          plutil -lint "肉鱼桌宠.app/Contents/Info.plist"
+          codesign --verify --deep --strict "肉鱼桌宠.app"
+          test "$(lipo -archs "肉鱼桌宠.app/Contents/MacOS/SmilePet")" = "x86_64 arm64" \
+            || test "$(lipo -archs "肉鱼桌宠.app/Contents/MacOS/SmilePet")" = "arm64 x86_64"

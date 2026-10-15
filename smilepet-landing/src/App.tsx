@@ -168,7 +168,7 @@ function SpritePet() {
       className={`sprite-pet${isReady ? ' is-ready' : ''}`}
       style={style}
       role="img"
-      aria-label="88 帧动态笑笑桌宠"
+      aria-label="88 帧动态肉鱼桌宠"
     />
   )
 }
@@ -204,7 +204,7 @@ function HeroStage({ sceneIndex }: { sceneIndex: number }) {
             <span />
             <span />
           </div>
-          <span className="window-title">XIAOXIAO://COMPANION</span>
+          <span className="window-title">ROUYU://COMPANION</span>
           <span className="window-live">
             <i />
             LIVE
@@ -231,7 +231,7 @@ function HeroStage({ sceneIndex }: { sceneIndex: number }) {
         <img
           className="hero-pet"
           src="/xiaoxiao.webp"
-          alt="笑笑桌宠，穿着白色绒衣微笑奔跑"
+          alt="肉鱼桌宠，穿着白色绒衣微笑奔跑"
           width="799"
           height="1181"
           fetchPriority="high"
@@ -288,12 +288,12 @@ function App() {
   return (
     <main>
       <nav className="nav-shell" aria-label="主导航">
-        <a className="brand" href="#top" aria-label="笑笑桌宠首页">
+        <a className="brand" href="#top" aria-label="肉鱼桌宠首页">
           <span className="brand-mark">
             <img src="/app-icon-64.png" alt="" width="64" height="64" />
           </span>
           <span className="brand-copy">
-            <strong>笑笑桌宠</strong>
+            <strong>肉鱼桌宠</strong>
             <small>AMBIENT COMPANION</small>
           </span>
         </a>
@@ -367,7 +367,7 @@ function App() {
         </div>
       </section>
 
-      <div className="marquee" aria-label="笑笑支持的场景">
+      <div className="marquee" aria-label="肉鱼支持的场景">
         <div className="marquee-track">
           {[...marqueeItems, ...marqueeItems].map((item, index) => (
             <span key={`${item}-${index}`}>
@@ -444,7 +444,7 @@ function App() {
             <div className="console-topline">
               <span>
                 <i />
-                XIAOXIAO LOCAL SIGNAL
+                ROUYU LOCAL SIGNAL
               </span>
               <span>LATENCY 0ms</span>
             </div>
@@ -463,7 +463,7 @@ function App() {
               </div>
             </div>
             <div className="console-message">
-              <span>笑笑：</span>
+              <span>肉鱼：</span>
               <strong>“{scene.message}”</strong>
             </div>
           </div>
@@ -502,7 +502,7 @@ function App() {
             </div>
             <img
               src="/control-center.png"
-              alt="笑笑桌宠原生陪伴控制中心"
+              alt="肉鱼桌宠原生陪伴控制中心"
               width="568"
               height="758"
               loading="lazy"
@@ -590,7 +590,7 @@ function App() {
           <div className="pipeline-card">
             <span>03 / REACT</span>
             <Sparkles size={28} />
-            <strong>笑笑做出反应</strong>
+            <strong>肉鱼做出反应</strong>
             <small>状态、台词与动效</small>
           </div>
         </div>
@@ -687,7 +687,7 @@ function App() {
           </span>
           <h2>她甚至能住进<br />你的 Codex。</h2>
           <p>
-            一整套官方自定义接口兼容的 88 帧笑笑皮肤：待机、奔跑、专注、报错、庆祝，
+            一整套官方自定义接口兼容的 88 帧肉鱼皮肤：待机、奔跑、专注、报错、庆祝，
             再加上暖白与墨棕主题。
           </p>
           <a className="text-link" href={`${GITHUB_URL}/tree/main/CodexSkin`} target="_blank" rel="noreferrer">
@@ -703,7 +703,7 @@ function App() {
               <span />
               <span />
             </div>
-            <small>codex — xiaoxiao.pet</small>
+            <small>codex — rouyu.pet</small>
             <Settings2 size={14} />
           </div>
           <div className="terminal-code">
@@ -738,7 +738,7 @@ function App() {
         />
         <div className="final-copy">
           <span className="final-kicker">YOUR MAC DESERVES A LITTLE LIFE.</span>
-          <h2>把笑笑<br />带回桌面。</h2>
+          <h2>把肉鱼<br />带回桌面。</h2>
           <p>免费下载 · macOS 13+ · 通用架构 · 完全本地</p>
           <div className="hero-actions">
             <a className="button button-dark" href={DOWNLOAD_URL}>
@@ -759,7 +759,7 @@ function App() {
             <img src="/app-icon-64.png" alt="" width="64" height="64" loading="lazy" />
           </span>
           <span className="brand-copy">
-            <strong>笑笑桌宠</strong>
+            <strong>肉鱼桌宠</strong>
             <small>AMBIENT COMPANION</small>
           </span>
         </a>
@@ -768,7 +768,7 @@ function App() {
           <a href={`${GITHUB_URL}/blob/main/PRIVACY.md`} target="_blank" rel="noreferrer">隐私</a>
           <a href={`${GITHUB_URL}/blob/main/SECURITY.md`} target="_blank" rel="noreferrer">安全</a>
           <a href={`${GITHUB_URL}/issues`} target="_blank" rel="noreferrer">反馈</a>
-          <span>© 2026 XIAOXIAO</span>
+          <span>© 2026 ROUYU</span>
         </div>
       </footer>
     </main>
