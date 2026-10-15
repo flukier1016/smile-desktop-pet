@@ -1,27 +1,17 @@
 import { createReadStream } from 'node:fs'
-import { stat } from 'node:fs/promises'
+import { readFile, readdir, stat } from 'node:fs/promises'
 import { createServer } from 'node:http'
-import { extname, join, normalize } from 'node:path'
+import { extname, join, resolve } from 'node:path'
+import { pipeline } from 'node:stream'
 import { fileURLToPath } from 'node:url'
-import {
-  constants as zlibConstants,
-  createBrotliCompress,
-  createGzip,
-} from 'node:zlib'
+import { brotliCompressSync, constants as zlibConstants, gzipSync } from 'node:zlib'
 
 const root = fileURLToPath(new URL('./dist/', import.meta.url))
-const port = Number.parseInt(process.env.PORT || '4173', 10)
-
 const contentTypes = {
-  '.avif': 'image/avif',
-  '.css': 'text/css; charset=utf-8',
-  '.html': 'text/html; charset=utf-8',
-  '.ico': 'image/x-icon',
-  '.js': 'text/javascript; charset=utf-8',
-  '.json': 'application/json; charset=utf-8',
-  '.png': 'image/png',
-  '.svg': 'image/svg+xml',
-  '.txt': 'text/plain; charset=utf-8',
+  '.avif': 'image/avif', '.css': 'text/css; charset=utf-8',
+  '.html': 'text/html; charset=utf-8', '.ico': 'image/x-icon',
+  '.js': 'text/javascript; charset=utf-8', '.json': 'application/json; charset=utf-8',
+  '.png': 'image/png', '.svg': 'image/svg+xml', '.txt': 'text/plain; charset=utf-8',
   '.webp': 'image/webp',
 }
 
@@ -49,145 +39,115 @@ const securityHeaders = {
 }
 
 const compressibleExtensions = new Set(['.css', '.html', '.js', '.json', '.svg', '.txt'])
-const compressionThreshold = 1024
-
-function resolveRequestPath(requestUrl) {
-  const pathname = decodeURIComponent(new URL(requestUrl, 'http://localhost').pathname)
-  const requested = pathname === '/' ? 'index.html' : pathname.slice(1)
-  const safePath = normalize(requested).replace(/^(\.\.(\/|\\|$))+/, '')
-  const candidate = join(root, safePath)
-  return candidate.startsWith(root) ? candidate : null
-}
 
 function cacheControl(pathname) {
-  if (pathname.includes('/assets/')) {
-    return 'public, max-age=31536000, immutable'
-  }
-  if (pathname.endsWith('.html')) {
-    return 'public, max-age=60, s-maxage=3600, stale-while-revalidate=86400'
-  }
+  if (pathname.startsWith('/assets/')) return 'public, max-age=31536000, immutable'
+  if (pathname.endsWith('.html')) return 'public, max-age=60, s-maxage=3600, stale-while-revalidate=86400'
   return 'public, max-age=86400'
 }
 
-function fileEtag(file) {
-  return `W/"${file.size.toString(16)}-${Math.trunc(file.mtimeMs).toString(16)}"`
+function representationFor(header, representations) {
+  const qualities = new Map()
+  for (const token of (header || '').split(',')) {
+    const [name, ...parameters] = token.trim().toLowerCase().split(';')
+    if (!name) continue
+    const parameter = parameters.find((value) => value.trim().startsWith('q='))
+    const quality = parameter ? Number(parameter.trim().slice(2)) : 1
+    qualities.set(name, Number.isFinite(quality) && quality >= 0 && quality <= 1 ? quality : 0)
+  }
+  const quality = (name) => qualities.get(name)
+    ?? (name === 'identity' ? (qualities.get('*') === 0 ? 0 : 1) : qualities.get('*') ?? 0)
+  return ['br', 'gzip', 'identity']
+    .filter((name) => representations.has(name) && quality(name) > 0)
+    .sort((a, b) => quality(b) - quality(a))[0]
 }
 
-function requestHasEtag(request, etag) {
-  const candidates = request.headers['if-none-match']
-  if (!candidates) return false
-  return candidates === '*' || candidates.split(',').some((candidate) => candidate.trim() === etag)
+async function loadAssets(directory, prefix = '') {
+  const assets = new Map()
+  for (const entry of await readdir(directory, { withFileTypes: true })) {
+    const path = join(directory, entry.name)
+    const pathname = `${prefix}/${entry.name}`
+    if (entry.isDirectory()) {
+      for (const [key, value] of await loadAssets(path, pathname)) assets.set(key, value)
+    } else if (entry.isFile()) {
+      const metadata = await stat(path)
+      const extension = extname(path).toLowerCase()
+      const representations = new Map([['identity', { size: metadata.size }]])
+      if (compressibleExtensions.has(extension)) {
+        const data = await readFile(path)
+        representations.set('identity', { data, size: data.length })
+        if (data.length >= 1024) {
+          const br = brotliCompressSync(data, { params: { [zlibConstants.BROTLI_PARAM_QUALITY]: 9 } })
+          const gzip = gzipSync(data, { level: 9 })
+          representations.set('br', { data: br, size: br.length })
+          representations.set('gzip', { data: gzip, size: gzip.length })
+        }
+      }
+      const headers = {
+        'Cache-Control': cacheControl(pathname),
+        'Content-Type': contentTypes[extension] || 'application/octet-stream',
+        ETag: `W/"${metadata.size.toString(16)}-${Math.trunc(metadata.mtimeMs).toString(16)}"`,
+        'Last-Modified': metadata.mtime.toUTCString(),
+        Vary: 'Accept-Encoding',
+      }
+      if (extension === '.html') headers['Surrogate-Control'] = 'max-age=3600, stale-while-revalidate=86400'
+      assets.set(pathname, { path, headers, representations })
+    }
+  }
+  if (!prefix && !assets.has('/index.html')) throw new Error('Build the landing page before starting the server')
+  return assets
 }
 
-function acceptedCompression(request, extension, size) {
-  if (
-    request.method !== 'GET' ||
-    size < compressionThreshold ||
-    !compressibleExtensions.has(extension)
-  ) {
-    return null
-  }
-
-  const accepted = request.headers['accept-encoding'] || ''
-  if (/\bbr\b/.test(accepted)) {
-    return 'br'
-  }
-  if (/\bgzip\b/.test(accepted)) {
-    return 'gzip'
-  }
-  return null
-}
-
-const server = createServer(async (request, response) => {
-  for (const [name, value] of Object.entries(securityHeaders)) {
-    response.setHeader(name, value)
-  }
-
-  if (request.method !== 'GET' && request.method !== 'HEAD') {
-    response.writeHead(405, { Allow: 'GET, HEAD' })
-    response.end('Method Not Allowed')
-    return
-  }
-
-  let filePath
-  try {
-    filePath = resolveRequestPath(request.url || '/')
-  } catch {
-    response.writeHead(400)
-    response.end('Bad Request')
-    return
-  }
-
-  if (!filePath) {
-    response.writeHead(403)
-    response.end('Forbidden')
-    return
-  }
-
-  try {
-    const file = await stat(filePath)
-    if (!file.isFile()) {
-      throw new Error('Not a file')
-    }
-
-    const extension = extname(filePath).toLowerCase()
-    const etag = fileEtag(file)
-    const headers = {
-      'Cache-Control': cacheControl(filePath),
-      'Content-Type': contentTypes[extension] || 'application/octet-stream',
-      ETag: etag,
-      'Last-Modified': file.mtime.toUTCString(),
-      Vary: 'Accept-Encoding',
-    }
-    if (extension === '.html') {
-      // Railway's edge cache is Fastly-backed. Keep browsers on revalidation
-      // while giving the surrogate a stable one-hour freshness window.
-      headers['Surrogate-Control'] = 'max-age=3600, stale-while-revalidate=86400'
-    }
-
-    if (requestHasEtag(request, etag)) {
-      response.writeHead(304, headers)
-      response.end()
+// Snapshot immutable build output once at startup. Text and compressed variants
+// stay in memory; requests do no stat calls and never repeat compression work.
+export async function createStaticServer({ directory = root } = {}) {
+  const assets = await loadAssets(directory)
+  return createServer((request, response) => {
+    for (const [name, value] of Object.entries(securityHeaders)) response.setHeader(name, value)
+    if (request.method !== 'GET' && request.method !== 'HEAD') {
+      response.writeHead(405, { Allow: 'GET, HEAD' }).end('Method Not Allowed')
       return
     }
-
-    const compression = acceptedCompression(request, extension, file.size)
-    if (compression) {
-      headers['Content-Encoding'] = compression
-    } else {
-      headers['Content-Length'] = file.size
+    let pathname
+    try {
+      pathname = decodeURIComponent(new URL(request.url || '/', 'http://localhost').pathname)
+      if (pathname.includes('\\') || pathname.includes('\0')) throw new Error('Invalid path')
+    } catch {
+      response.writeHead(400).end('Bad Request')
+      return
     }
+    const asset = assets.get(pathname === '/' ? '/index.html' : pathname)
+    if (!asset) {
+      response.writeHead(404).end('Not Found')
+      return
+    }
+    const headers = { ...asset.headers }
+    const candidates = request.headers['if-none-match']
+    if (candidates && (candidates.trim() === '*' || candidates.split(',').some(
+      (value) => value.trim().replace(/^W\//, '') === headers.ETag.replace(/^W\//, '')
+    ))) {
+      response.writeHead(304, headers).end()
+      return
+    }
+    const encoding = representationFor(request.headers['accept-encoding'], asset.representations)
+    if (!encoding) {
+      response.writeHead(406, { Vary: 'Accept-Encoding' }).end('Not Acceptable')
+      return
+    }
+    const representation = asset.representations.get(encoding)
+    headers['Content-Length'] = representation.size
+    if (encoding !== 'identity') headers['Content-Encoding'] = encoding
     response.writeHead(200, headers)
+    if (request.method === 'HEAD') response.end()
+    else if (representation.data) response.end(representation.data)
+    else pipeline(createReadStream(asset.path), response, (error) => {
+      if (error) response.destroy(error)
+    })
+  })
+}
 
-    if (request.method === 'HEAD') {
-      response.end()
-      return
-    }
-
-    const stream = createReadStream(filePath)
-    if (compression === 'br') {
-      stream
-        .pipe(
-          createBrotliCompress({
-            params: {
-              [zlibConstants.BROTLI_PARAM_QUALITY]: 4,
-            },
-          }),
-        )
-        .pipe(response)
-      return
-    }
-    if (compression === 'gzip') {
-      stream.pipe(createGzip({ level: 6 })).pipe(response)
-      return
-    }
-    stream.pipe(response)
-  } catch {
-    response.writeHead(404)
-    response.end('Not Found')
-  }
-})
-
-server.listen(port, '0.0.0.0', () => {
-  console.log(`SmilePet landing is ready on port ${port}`)
-})
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  const server = await createStaticServer()
+  const port = Number.parseInt(process.env.PORT || '4173', 10)
+  server.listen(port, '0.0.0.0', () => console.log(`SmilePet landing is ready on port ${port}`))
+}

@@ -1,6 +1,7 @@
 # SmilePet Landing Page
 
-笑笑桌宠的官方产品页，使用 React、TypeScript、Vite 和 Tailwind CSS 构建。
+笑笑桌宠的官方产品页，使用 React 作为构建时模板，TypeScript、Vite 和 Tailwind CSS 构建。
+线上直接发送静态 HTML 与约 5.4 KB 的交互脚本，不下载 React 运行时。
 
 ## 本地开发
 
@@ -14,6 +15,7 @@ pnpm dev
 ```bash
 pnpm lint
 pnpm build
+pnpm test
 ```
 
 ## Railway
@@ -37,3 +39,13 @@ railway cdn update \
 
 页面不加载统计、广告、Cookie 或提交表单。App 的完整隐私与安全边界分别记录在
 仓库根目录的 `PRIVACY.md` 与 `SECURITY.md`。
+
+## 性能实现
+
+- 构建时输出完整 HTML，浏览器下载 JavaScript 前即可显示产品内容；React 只在开发／构建阶段使用。
+- 线上交互只修改 Hero 与场景示例的相关节点；鼠标事件每帧合并，没有 React 渲染或每帧计时器。
+- 88 帧精灵使用整张图的合成层位移，只在接近视口时加载；离屏和后台标签页暂停播放。
+- 各区域持续动画按可见性暂停；手机减少模糊、阴影和轨道动画，遵循减少动态效果设置。
+- 服务启动时缓存文件元数据、HTML/JS/CSS 以及 Brotli/gzip 版本，请求时直接发送；保留 Railway 边缘缓存策略。
+- 下载按钮继续指向实际公开发布的稳定版，源码性能版尚未发布前不生成无效安装包链接。
+- `pnpm test` 在构建后执行，包含 16 KiB JavaScript 体积预算，防止重新引入大型运行时。

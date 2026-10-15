@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, type CSSProperties, type PointerEvent } from 'react'
+import type { CSSProperties } from 'react'
+import { sceneDetails } from './scenes'
 import {
   Apple,
   ArrowDownToLine,
@@ -28,52 +29,8 @@ const GITHUB_URL = 'https://github.com/flukier1016/smile-desktop-pet'
 const CHECKSUM_URL =
   'https://github.com/flukier1016/smile-desktop-pet/releases/download/v1.4.1/SHA256SUMS.txt'
 
-const scenes = [
-  {
-    id: 'develop',
-    number: '04',
-    label: '开发',
-    title: '认真写代码',
-    subtitle: 'Claude · 前台 App',
-    message: '我不催你。这个 bug 我们一起盯。',
-    note: '检测到开发环境，进入专注陪伴',
-    icon: Code2,
-    color: '#4d918c',
-  },
-  {
-    id: 'market',
-    number: '11',
-    label: '盯盘',
-    title: '市场雷达开启',
-    subtitle: 'TradingView · 本地场景',
-    message: '先看风险，再看机会。别追那根线。',
-    note: '识别到金融场景，切换风险提醒',
-    icon: BarChart3,
-    color: '#d64a3a',
-  },
-  {
-    id: 'meeting',
-    number: '16',
-    label: '会议',
-    title: '安静旁听中',
-    subtitle: 'Zoom · 前台 App',
-    message: '我替你守着桌面，记得留行动项。',
-    note: '检测到会议，降低动效和提示频率',
-    icon: Video,
-    color: '#7a6ab3',
-  },
-  {
-    id: 'break',
-    number: '21',
-    label: '摸鱼',
-    title: '合理休息',
-    subtitle: 'Bilibili · 本地场景',
-    message: '五分钟可以。第六分钟我会眨眼。',
-    note: '识别到休息场景，启动轻松模式',
-    icon: Coffee,
-    color: '#df8d58',
-  },
-]
+const sceneIcons = [Code2, BarChart3, Video, Coffee]
+const scenes = sceneDetails.map((scene, index) => ({ ...scene, icon: sceneIcons[index] }))
 
 const dailyActions = [
   { label: '摸摸', icon: Heart, detail: '今日已点亮' },
@@ -108,94 +65,17 @@ function GitHubIcon({ size = 18 }: { size?: number }) {
   )
 }
 
-function useReducedMotion() {
-  const [reduced, setReduced] = useState(false)
-
-  useEffect(() => {
-    const query = window.matchMedia('(prefers-reduced-motion: reduce)')
-    const sync = () => setReduced(query.matches)
-    sync()
-    query.addEventListener('change', sync)
-    return () => query.removeEventListener('change', sync)
-  }, [])
-
-  return reduced
-}
-
 function SpritePet() {
-  const [frame, setFrame] = useState(24)
-  const [isReady, setIsReady] = useState(false)
-  const petRef = useRef<HTMLDivElement>(null)
-  const reducedMotion = useReducedMotion()
-
-  useEffect(() => {
-    const pet = petRef.current
-    if (!pet || !('IntersectionObserver' in window)) {
-      setIsReady(true)
-      return
-    }
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setIsReady(true)
-          observer.disconnect()
-        }
-      },
-      { rootMargin: '800px 0px' },
-    )
-    observer.observe(pet)
-    return () => observer.disconnect()
-  }, [])
-
-  useEffect(() => {
-    if (reducedMotion || !isReady) return
-    const timer = window.setInterval(() => {
-      setFrame((current) => (current + 1) % 88)
-    }, 115)
-    return () => window.clearInterval(timer)
-  }, [isReady, reducedMotion])
-
-  const column = frame % 8
-  const row = Math.floor(frame / 8)
-  const style = {
-    backgroundPosition: `${(column / 7) * 100}% ${(row / 10) * 100}%`,
-  }
-
-  return (
-    <div
-      ref={petRef}
-      className={`sprite-pet${isReady ? ' is-ready' : ''}`}
-      style={style}
-      role="img"
-      aria-label="88 帧动态笑笑桌宠"
-    />
-  )
+  return <div className="sprite-pet" role="img" aria-label="88 帧动态笑笑桌宠" />
 }
 
-function HeroStage({ sceneIndex }: { sceneIndex: number }) {
-  const scene = scenes[sceneIndex]
-  const [tilt, setTilt] = useState({ x: 0, y: 0 })
-  const reducedMotion = useReducedMotion()
-
-  const handlePointerMove = (event: PointerEvent<HTMLDivElement>) => {
-    if (reducedMotion) return
-    const rect = event.currentTarget.getBoundingClientRect()
-    const x = (event.clientX - rect.left) / rect.width - 0.5
-    const y = (event.clientY - rect.top) / rect.height - 0.5
-    setTilt({ x: x * 7, y: y * -6 })
-  }
-
-  const stageStyle = {
-    '--scene-color': scene.color,
-    transform: `perspective(1200px) rotateX(${tilt.y}deg) rotateY(${tilt.x}deg)`,
-  } as CSSProperties
+function HeroStage() {
+  const scene = scenes[0]
+  const stageStyle = { '--scene-color': scene.color } as CSSProperties
 
   return (
     <div
       className="hero-stage-wrap"
-      onPointerMove={handlePointerMove}
-      onPointerLeave={() => setTilt({ x: 0, y: 0 })}
     >
       <div className="hero-stage" style={stageStyle}>
         <div className="window-bar">
@@ -220,7 +100,7 @@ function HeroStage({ sceneIndex }: { sceneIndex: number }) {
 
         <div className="scene-chip scene-chip-top">
           <ScanLine size={14} />
-          SCENE {scene.number}/23
+          <span>SCENE {scene.number}/23</span>
         </div>
         <div className="scene-chip scene-chip-bottom">
           <LockKeyhole size={14} />
@@ -271,20 +151,96 @@ function HeroStage({ sceneIndex }: { sceneIndex: number }) {
   )
 }
 
-function App() {
-  const [activeScene, setActiveScene] = useState(0)
-  const reducedMotion = useReducedMotion()
-
-  useEffect(() => {
-    if (reducedMotion) return
-    const timer = window.setInterval(() => {
-      setActiveScene((current) => (current + 1) % scenes.length)
-    }, 3600)
-    return () => window.clearInterval(timer)
-  }, [reducedMotion])
-
+function SceneShowcase() {
+  const activeScene = 0
   const scene = scenes[activeScene]
+  return (
+      <section data-motion-region="" data-active="false" className="scenes-section" id="scenes">
+        <div className="section-heading">
+          <div>
+            <div className="section-label light">
+              <span>02</span>
+              场景感知
+            </div>
+            <h2>她知道你在忙什么。</h2>
+          </div>
+          <p>
+            默认只读取前台 App；可选本地 OCR 会在内存中识别当前窗口，
+            把你的桌面切换成恰到好处的陪伴现场。
+          </p>
+        </div>
 
+        <div className="scene-console" style={{ '--scene-color': scene.color } as CSSProperties}>
+          <div className="scene-tabs" role="tablist" aria-label="场景示例">
+            {scenes.map((item, index) => (
+              <button
+                key={item.id}
+                type="button"
+                role="tab"
+                aria-selected={activeScene === index}
+                className={activeScene === index ? 'active' : ''}
+                data-scene-index={index}
+              >
+                <item.icon size={18} />
+                <span>{item.label}</span>
+                <small>{item.number}/23</small>
+              </button>
+            ))}
+          </div>
+
+          <div className="console-main">
+            <div className="console-topline">
+              <span>
+                <i />
+                XIAOXIAO LOCAL SIGNAL
+              </span>
+              <span>LATENCY 0ms</span>
+            </div>
+            <div className="console-scene">
+              <span className="huge-scene-number">{scene.number}</span>
+              <div className="scene-readout">
+                <scene.icon size={34} />
+                <p>当前场景</p>
+                <h3>{scene.title}</h3>
+                <span>{scene.subtitle}</span>
+              </div>
+              <div className="waveform" aria-hidden="true">
+                {Array.from({ length: 18 }).map((_, index) => (
+                  <i key={index} style={{ '--wave': `${18 + ((index * 23) % 74)}%` } as CSSProperties} />
+                ))}
+              </div>
+            </div>
+            <div className="console-message">
+              <span>笑笑：</span>
+              <strong>“{scene.message}”</strong>
+            </div>
+          </div>
+
+          <aside className="console-aside">
+            <span className="aside-kicker">LOCAL EVENT LOG</span>
+            <div className="event-entry">
+              <i>16:42:08</i>
+              <p>{scene.note}</p>
+            </div>
+            <div className="event-entry">
+              <i>16:42:08</i>
+              <p>截图与识别文字仅在内存短暂存在</p>
+            </div>
+            <div className="event-entry success">
+              <Check size={15} />
+              <p>网络请求：0</p>
+            </div>
+            <div className="local-stamp">
+              <LockKeyhole size={24} />
+              <span>PROCESSED<br />ON YOUR MAC</span>
+            </div>
+          </aside>
+        </div>
+      </section>
+  )
+}
+
+function LandingContent() {
   return (
     <main>
       <nav className="nav-shell" aria-label="主导航">
@@ -310,7 +266,7 @@ function App() {
         </a>
       </nav>
 
-      <section className="hero-section" id="top">
+      <section data-motion-region="" data-active="false" className="hero-section" id="top">
         <div className="ambient-glow glow-one" aria-hidden="true" />
         <div className="ambient-glow glow-two" aria-hidden="true" />
         <div className="hero-copy">
@@ -359,7 +315,7 @@ function App() {
           </div>
         </div>
 
-        <HeroStage sceneIndex={activeScene} />
+        <HeroStage />
 
         <div className="scroll-cue" aria-hidden="true">
           <MousePointer2 size={14} />
@@ -367,7 +323,7 @@ function App() {
         </div>
       </section>
 
-      <div className="marquee" aria-label="笑笑支持的场景">
+      <div className="marquee" data-motion-region="" data-active="false" aria-label="笑笑支持的场景">
         <div className="marquee-track">
           {[...marqueeItems, ...marqueeItems].map((item, index) => (
             <span key={`${item}-${index}`}>
@@ -378,7 +334,7 @@ function App() {
         </div>
       </div>
 
-      <section className="statement-section">
+      <section data-motion-region="" data-active="false" className="statement-section">
         <div className="section-label">
           <span>01</span>
           不只是桌面挂件
@@ -407,90 +363,9 @@ function App() {
         </div>
       </section>
 
-      <section className="scenes-section" id="scenes">
-        <div className="section-heading">
-          <div>
-            <div className="section-label light">
-              <span>02</span>
-              场景感知
-            </div>
-            <h2>她知道你在忙什么。</h2>
-          </div>
-          <p>
-            默认只读取前台 App；可选本地 OCR 会在内存中识别当前窗口，
-            把你的桌面切换成恰到好处的陪伴现场。
-          </p>
-        </div>
+      <SceneShowcase />
 
-        <div className="scene-console" style={{ '--scene-color': scene.color } as CSSProperties}>
-          <div className="scene-tabs" role="tablist" aria-label="场景示例">
-            {scenes.map((item, index) => (
-              <button
-                key={item.id}
-                type="button"
-                role="tab"
-                aria-selected={activeScene === index}
-                className={activeScene === index ? 'active' : ''}
-                onClick={() => setActiveScene(index)}
-              >
-                <item.icon size={18} />
-                <span>{item.label}</span>
-                <small>{item.number}/23</small>
-              </button>
-            ))}
-          </div>
-
-          <div className="console-main">
-            <div className="console-topline">
-              <span>
-                <i />
-                XIAOXIAO LOCAL SIGNAL
-              </span>
-              <span>LATENCY 0ms</span>
-            </div>
-            <div className="console-scene">
-              <span className="huge-scene-number">{scene.number}</span>
-              <div className="scene-readout">
-                <scene.icon size={34} />
-                <p>当前场景</p>
-                <h3>{scene.title}</h3>
-                <span>{scene.subtitle}</span>
-              </div>
-              <div className="waveform" aria-hidden="true">
-                {Array.from({ length: 42 }).map((_, index) => (
-                  <i key={index} style={{ '--wave': `${18 + ((index * 23) % 74)}%` } as CSSProperties} />
-                ))}
-              </div>
-            </div>
-            <div className="console-message">
-              <span>笑笑：</span>
-              <strong>“{scene.message}”</strong>
-            </div>
-          </div>
-
-          <aside className="console-aside">
-            <span className="aside-kicker">LOCAL EVENT LOG</span>
-            <div className="event-entry">
-              <i>16:42:08</i>
-              <p>{scene.note}</p>
-            </div>
-            <div className="event-entry">
-              <i>16:42:08</i>
-              <p>截图与识别文字仅在内存短暂存在</p>
-            </div>
-            <div className="event-entry success">
-              <Check size={15} />
-              <p>网络请求：0</p>
-            </div>
-            <div className="local-stamp">
-              <LockKeyhole size={24} />
-              <span>PROCESSED<br />ON YOUR MAC</span>
-            </div>
-          </aside>
-        </div>
-      </section>
-
-      <section className="companion-section">
+      <section data-motion-region="" data-active="false" className="companion-section">
         <div className="companion-visual">
           <div className="control-halo" aria-hidden="true" />
           <div className="control-window">
@@ -555,7 +430,7 @@ function App() {
         </div>
       </section>
 
-      <section className="privacy-section" id="privacy">
+      <section data-motion-region="" data-active="false" className="privacy-section" id="privacy">
         <div className="privacy-noise" aria-hidden="true" />
         <div className="section-label light">
           <span>04</span>
@@ -606,7 +481,7 @@ function App() {
         </div>
       </section>
 
-      <section className="security-section" id="security">
+      <section data-motion-region="" data-active="false" className="security-section" id="security">
         <div className="section-label">
           <span>05</span>
           安全工程
@@ -675,7 +550,7 @@ function App() {
         </div>
       </section>
 
-      <section className="codex-section" id="codex">
+      <section data-motion-region="" data-active="false" className="codex-section" id="codex">
         <div className="codex-copy">
           <div className="section-label">
             <span>06</span>
@@ -724,7 +599,7 @@ function App() {
         </div>
       </section>
 
-      <section className="final-section">
+      <section data-motion-region="" data-active="false" className="final-section">
         <div className="final-orbit orbit-a" aria-hidden="true" />
         <div className="final-orbit orbit-b" aria-hidden="true" />
         <img
@@ -773,6 +648,10 @@ function App() {
       </footer>
     </main>
   )
+}
+
+function App() {
+  return <LandingContent />
 }
 
 export default App

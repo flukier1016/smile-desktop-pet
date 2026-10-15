@@ -4,13 +4,14 @@ private final class CompanionProgressBar: NSView {
     var progress: Double = 0 {
         didSet {
             progress = max(0, min(1, progress))
+            guard progress != oldValue else { return }
             needsDisplay = true
             setAccessibilityValue("\(Int(round(progress * 100)))%")
         }
     }
 
     var accentColor = NSColor.controlAccentColor {
-        didSet { needsDisplay = true }
+        didSet { if !accentColor.isEqual(oldValue) { needsDisplay = true } }
     }
 
     override init(frame frameRect: NSRect) {
@@ -55,7 +56,7 @@ private final class CompanionProgressBar: NSView {
     }
 }
 
-struct ControlCenterState {
+struct ControlCenterState: Equatable {
     let scene: PetScene
     let appName: String
     let source: String
@@ -84,6 +85,9 @@ final class ControlCenterController: NSObject {
     var onCelebrate: (() -> Void)?
 
     private var panel: NSPanel?
+    private var lastState: ControlCenterState?
+
+    var isVisible: Bool { panel?.isVisible ?? false }
 
     private let sceneCard = NSView()
     private let sceneIconLabel = NSTextField(labelWithString: "🌸")
@@ -141,7 +145,7 @@ final class ControlCenterController: NSObject {
         if panel == nil {
             panel = buildPanel()
         }
-        update(state)
+        update(state, force: true)
         if preferCompanionPage {
             pageControl.selectedSegment = 0
             updateVisiblePage()
@@ -164,8 +168,9 @@ final class ControlCenterController: NSObject {
         panel?.makeKeyAndOrderFront(nil)
     }
 
-    func update(_ state: ControlCenterState) {
-        guard panel != nil else { return }
+    func update(_ state: ControlCenterState, force: Bool = false) {
+        guard panel != nil, force || isVisible, state != lastState else { return }
+        lastState = state
 
         sceneIconLabel.stringValue = state.scene.emoji
         sceneTitleLabel.stringValue = state.scene.title

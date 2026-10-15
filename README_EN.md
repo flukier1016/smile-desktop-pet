@@ -16,6 +16,11 @@
 
 </div>
 
+The **v1.5.0 source build** replaces continuous window redrawing with cached
+Core Animation layers and optimizes the landing page. Public download links
+still point to the published stable release. Run `./build.sh` to try the update;
+see [performance notes](docs/PERFORMANCE.md) for measurement details.
+
 Smile lives above your desktop without taking a Dock slot. She reacts to clicks,
 remembers her position and size, and automatically switches between 23 scenes
 such as coding, debugging, tests passing, spreadsheets, markets, meetings,

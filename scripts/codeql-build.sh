@@ -23,6 +23,7 @@ xcrun --sdk macosx swiftc \
   "$PROJECT_DIR/Sources/CompanionProgress.swift" \
   "$PROJECT_DIR/Sources/ControlCenter.swift" \
   "$PROJECT_DIR/Sources/PetApp.swift" \
+  "$PROJECT_DIR/Sources/PetView.swift" \
   -framework AppKit \
   -framework QuartzCore \
   -framework ScreenCaptureKit \
