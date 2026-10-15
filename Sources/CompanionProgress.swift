@@ -57,7 +57,7 @@ enum CompanionAction: String {
     }
 }
 
-struct CompanionSnapshot {
+struct CompanionSnapshot: Equatable {
     let totalExperience: Int
     let totalInteractions: Int
     let level: Int

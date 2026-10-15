@@ -415,197 +415,281 @@ enum AwarenessClassifier {
     }
 }
 
+// Invalidating a request makes its result unusable, but preserves the in-flight
+// slot until completion so rapid app switches cannot queue overlapping captures.
+struct OCRScanState {
+    struct Request: Equatable {
+        let id = UUID()
+        let generation: UInt64
+    }
+    private(set) var inFlight: Request?
+    private var generation: UInt64 = 0
+
+    mutating func begin() -> Request? {
+        guard inFlight == nil else { return nil }
+        let request = Request(generation: generation)
+        inFlight = request
+        return request
+    }
+
+    mutating func invalidate() { generation &+= 1 }
+
+    mutating func complete(_ request: Request) -> Bool {
+        guard inFlight == request else { return false }
+        inFlight = nil
+        return request.generation == generation
+    }
+}
+
 final class AwarenessEngine {
-    private let defaults = UserDefaults.standard
+    typealias Recognition = (title: String, text: String)
+    typealias WindowRecognizer = (pid_t, @escaping (Recognition) -> Void) -> Void
+
+    private let permissionCheck: () -> Bool
+    private let applicationProvider: () -> NSRunningApplication?
+    private let idleTimeProvider: () -> TimeInterval
+    private let recognitionOverride: WindowRecognizer?
+    private let defaults: UserDefaults
     private let scanQueue = DispatchQueue(label: "com.local.smile-desktop-pet.awareness", qos: .utility)
     private var timer: Timer?
-    private var isScanning = false
+    private var appChangeWork: DispatchWorkItem?
+    private var applicationObserver: NSObjectProtocol?
+    private var scanState = OCRScanState()
+    private var isRunning = false
+    private var isSuspended = false
     private var lastOCRDate = Date.distantPast
     private var lastOCRText = ""
+    private var lastWindowTitle = ""
+    private var hasOCRResult = false
     private var lastExternalApplication: NSRunningApplication?
     private var lastBundleIdentifier = ""
+    private var lastProcessIdentifier: pid_t?
     private var lastDeliveredBundleIdentifier = ""
     private var activeSince = Date()
     private var lastScene: PetScene = .companion
     private var lastSceneChange = Date.distantPast
     private var manualScene: PetScene?
     private var pausedUntil: Date?
+    private(set) var hasScreenCapturePermission = false
 
     var onSceneChange: ((PetScene, AwarenessSnapshot) -> Void)?
     var onSnapshot: ((AwarenessSnapshot, PetScene) -> Void)?
-    var onPermissionProblem: (() -> Void)?
+
+    init(
+        defaults: UserDefaults = .standard,
+        applicationProvider: @escaping () -> NSRunningApplication? = { NSWorkspace.shared.frontmostApplication },
+        permissionCheck: @escaping () -> Bool = { CGPreflightScreenCaptureAccess() },
+        idleTimeProvider: @escaping () -> TimeInterval = { AwarenessEngine.inputIdleSeconds() },
+        recognizer: WindowRecognizer? = nil
+    ) {
+        self.defaults = defaults
+        self.applicationProvider = applicationProvider
+        self.permissionCheck = permissionCheck
+        self.idleTimeProvider = idleTimeProvider
+        self.recognitionOverride = recognizer
+    }
+
+    deinit {
+        timer?.invalidate()
+        appChangeWork?.cancel()
+        if let applicationObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(applicationObserver)
+        }
+    }
 
     var isEnabled: Bool {
-        let value = defaults.object(forKey: "awarenessEnabled")
-        return value == nil ? true : defaults.bool(forKey: "awarenessEnabled")
+        defaults.object(forKey: "awarenessEnabled") == nil || defaults.bool(forKey: "awarenessEnabled")
     }
-
-    var isOCREnabled: Bool {
-        defaults.bool(forKey: "screenOCREnabled")
-    }
-
+    var isOCREnabled: Bool { defaults.bool(forKey: "screenOCREnabled") }
     var ocrInterval: TimeInterval {
         let saved = defaults.double(forKey: "ocrInterval")
-        return saved >= 5 ? saved : 15
+        return saved.isFinite && saved >= 5 ? min(saved, 300) : 15
     }
-
-    var isPaused: Bool {
-        pausedUntil.map { $0 > Date() } ?? false
-    }
-
-    var selectedManualScene: PetScene? {
-        manualScene
-    }
-
-    var hasScreenCapturePermission: Bool {
-        CGPreflightScreenCaptureAccess()
-    }
+    var isPaused: Bool { pausedUntil.map { $0 > Date() } ?? false }
+    var selectedManualScene: PetScene? { manualScene }
 
     func start() {
-        timer?.invalidate()
-        timer = Timer.scheduledTimer(
-            timeInterval: 4,
-            target: self,
-            selector: #selector(timerFired),
-            userInfo: nil,
-            repeats: true
-        )
-        if let timer {
-            RunLoop.main.add(timer, forMode: .common)
+        guard !isRunning else { return }
+        isRunning = true
+        applicationObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            guard let self, self.isEnabled, !self.isSuspended,
+                  !self.isPaused, self.manualScene == nil else { return }
+            self.appChangeWork?.cancel()
+            let work = DispatchWorkItem { [weak self] in self?.refreshNow() }
+            self.appChangeWork = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15, execute: work)
         }
         refreshNow()
     }
 
     func stop() {
+        isRunning = false
         timer?.invalidate()
         timer = nil
+        appChangeWork?.cancel()
+        appChangeWork = nil
+        if let applicationObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(applicationObserver)
+            self.applicationObserver = nil
+        }
+        invalidateOCR()
+    }
+
+    func setSuspended(_ suspended: Bool) {
+        guard suspended != isSuspended else { return }
+        isSuspended = suspended
+        invalidateOCR()
+        refreshNow()
     }
 
     func setEnabled(_ enabled: Bool) {
         defaults.set(enabled, forKey: "awarenessEnabled")
+        invalidateOCR()
         if enabled {
             pausedUntil = nil
             manualScene = nil
             lastScene = .companion
             lastSceneChange = .distantPast
-            refreshNow()
-        }
-    }
-
-    func setOCREnabled(_ enabled: Bool) {
-        defaults.set(enabled, forKey: "screenOCREnabled")
-        lastOCRDate = .distantPast
-        if !enabled {
-            lastOCRText = ""
         }
         refreshNow()
     }
 
+    func setOCREnabled(_ enabled: Bool) {
+        defaults.set(enabled, forKey: "screenOCREnabled")
+        invalidateOCR()
+        if !enabled { hasScreenCapturePermission = false }
+        refreshNow()
+    }
+
     func setOCRInterval(_ interval: TimeInterval) {
-        defaults.set(interval, forKey: "ocrInterval")
-        lastOCRDate = .distantPast
+        defaults.set(interval.isFinite ? max(5, min(300, interval)) : 15, forKey: "ocrInterval")
+        invalidateOCR()
         refreshNow()
     }
 
     func pause(for duration: TimeInterval) {
         pausedUntil = Date().addingTimeInterval(duration)
+        invalidateOCR()
+        refreshNow()
     }
 
     func resumeAutomatic() {
         pausedUntil = nil
         manualScene = nil
+        invalidateOCR()
         refreshNow()
     }
 
     func preview(_ scene: PetScene) {
         manualScene = scene
         pausedUntil = nil
-        let snapshot = baseSnapshot(usedOCR: false)
-        deliver(scene: scene, snapshot: snapshot, force: true)
+        invalidateOCR()
+        timer?.invalidate()
+        timer = nil
+        deliver(scene: scene, snapshot: baseSnapshot(usedOCR: false), force: true)
     }
 
     func requestScreenCapturePermission() -> Bool {
-        if CGPreflightScreenCaptureAccess() {
-            return true
-        }
-        return CGRequestScreenCaptureAccess()
+        hasScreenCapturePermission = permissionCheck() || CGRequestScreenCaptureAccess()
+        return hasScreenCapturePermission
     }
 
     func refreshNow() {
-        guard isEnabled, !isPaused else { return }
-        if let manualScene {
-            let snapshot = baseSnapshot(usedOCR: false)
-            deliver(scene: manualScene, snapshot: snapshot, force: false)
+        timer?.invalidate()
+        timer = nil
+        guard isRunning, isEnabled, !isSuspended else { return }
+        if let pausedUntil, pausedUntil > Date() {
+            scheduleRefresh(after: pausedUntil.timeIntervalSinceNow)
             return
         }
+        pausedUntil = nil
+        guard manualScene == nil else { return }
         scan()
+        let lowPower = ProcessInfo.processInfo.isLowPowerModeEnabled
+        var delay: TimeInterval = lowPower ? 30 : 15
+        if isOCREnabled && hasScreenCapturePermission && scanState.inFlight == nil && idleTimeProvider() < 300 {
+            let remaining = max(1, effectiveOCRInterval - Date().timeIntervalSince(lastOCRDate))
+            delay = min(delay, remaining)
+        }
+        scheduleRefresh(after: delay)
     }
 
-    @objc private func timerFired() {
-        if let pausedUntil, pausedUntil <= Date() {
-            self.pausedUntil = nil
-        }
-        refreshNow()
+    private var effectiveOCRInterval: TimeInterval {
+        ProcessInfo.processInfo.isLowPowerModeEnabled ? max(30, ocrInterval) : ocrInterval
+    }
+
+    private func scheduleRefresh(after interval: TimeInterval) {
+        let delay = max(0.1, interval)
+        timer = Timer(timeInterval: delay, repeats: false) { [weak self] _ in self?.refreshNow() }
+        timer?.tolerance = min(1, delay * 0.1)
+        if let timer { RunLoop.main.add(timer, forMode: .common) }
+    }
+
+    private func invalidateOCR() {
+        scanState.invalidate()
+        lastOCRText = ""
+        lastWindowTitle = ""
+        hasOCRResult = false
+        lastOCRDate = .distantPast
     }
 
     private func scan() {
-        guard !isScanning else { return }
-        isScanning = true
-
         let application = externalFrontmostApplication()
+        let pid = application?.processIdentifier
         updateActiveDuration(for: application?.bundleIdentifier ?? application?.localizedName ?? "")
-        let appName = application?.localizedName ?? "桌面"
-        let bundleID = application?.bundleIdentifier ?? ""
-        let activeDuration = Date().timeIntervalSince(activeSince)
-        let idleSeconds = secondsSinceLastInput()
-        let shouldUseOCR = isOCREnabled && hasScreenCapturePermission
-            && Date().timeIntervalSince(lastOCRDate) >= ocrInterval
-
-        guard shouldUseOCR, let pid = application?.processIdentifier else {
-            let snapshot = AwarenessSnapshot(
-                appName: appName,
-                bundleIdentifier: bundleID,
-                windowTitle: "",
-                usedOCR: isOCREnabled && hasScreenCapturePermission,
-                idleSeconds: idleSeconds,
-                activeDuration: activeDuration,
-                capturedAt: Date()
-            )
-            finishScan(snapshot: snapshot, ocrText: lastOCRText)
-            return
+        if pid != lastProcessIdentifier {
+            lastProcessIdentifier = pid
+            invalidateOCR()
         }
-
+        if isOCREnabled {
+            hasScreenCapturePermission = permissionCheck()
+            if !hasScreenCapturePermission { invalidateOCR() }
+        }
+        let snapshot = makeSnapshot(application: application, usedOCR: hasOCRResult)
+        // Classify immediately. A slow OCR request never holds up an app switch.
+        finishScan(snapshot: snapshot, ocrText: lastOCRText)
+        guard isOCREnabled, hasScreenCapturePermission, snapshot.idleSeconds < 300,
+              Date().timeIntervalSince(lastOCRDate) >= effectiveOCRInterval,
+              let pid, let request = scanState.begin() else { return }
         lastOCRDate = Date()
         recognizeFrontWindow(processIdentifier: pid) { [weak self] result in
-            guard let self else { return }
             DispatchQueue.main.async {
+                guard let self else { return }
+                let valid = self.scanState.complete(request)
+                guard valid, self.isRunning, self.isEnabled, self.isOCREnabled,
+                      !self.isSuspended, !self.isPaused, self.manualScene == nil,
+                      self.externalFrontmostApplication()?.processIdentifier == pid,
+                      self.permissionCheck() else {
+                    self.refreshNow()
+                    return
+                }
                 self.lastOCRText = result.text
-                let snapshot = AwarenessSnapshot(
-                    appName: appName,
-                    bundleIdentifier: bundleID,
-                    windowTitle: result.title,
-                    usedOCR: true,
-                    idleSeconds: idleSeconds,
-                    activeDuration: activeDuration,
-                    capturedAt: Date()
-                )
-                self.finishScan(snapshot: snapshot, ocrText: result.text)
+                self.lastWindowTitle = result.title
+                self.hasOCRResult = !result.text.isEmpty || !result.title.isEmpty
+                self.refreshNow()
             }
         }
     }
 
-    private func finishScan(snapshot: AwarenessSnapshot, ocrText: String) {
-        let hour = Calendar.current.component(.hour, from: snapshot.capturedAt)
-        let scene = AwarenessClassifier.classify(
-            appName: snapshot.appName,
-            bundleIdentifier: snapshot.bundleIdentifier,
-            windowTitle: snapshot.windowTitle,
-            ocrText: ocrText,
-            idleSeconds: snapshot.idleSeconds,
-            activeDuration: snapshot.activeDuration,
-            hour: hour
+    private func makeSnapshot(application: NSRunningApplication?, usedOCR: Bool) -> AwarenessSnapshot {
+        AwarenessSnapshot(
+            appName: application?.localizedName ?? "桌面",
+            bundleIdentifier: application?.bundleIdentifier ?? "",
+            windowTitle: usedOCR ? lastWindowTitle : "", usedOCR: usedOCR,
+            idleSeconds: idleTimeProvider(), activeDuration: Date().timeIntervalSince(activeSince),
+            capturedAt: Date()
         )
-        isScanning = false
+    }
+
+    private func finishScan(snapshot: AwarenessSnapshot, ocrText: String) {
+        let scene = AwarenessClassifier.classify(
+            appName: snapshot.appName, bundleIdentifier: snapshot.bundleIdentifier,
+            windowTitle: snapshot.windowTitle, ocrText: ocrText,
+            idleSeconds: snapshot.idleSeconds, activeDuration: snapshot.activeDuration,
+            hour: Calendar.current.component(.hour, from: snapshot.capturedAt)
+        )
         deliver(scene: scene, snapshot: snapshot, force: false)
     }
 
@@ -614,18 +698,16 @@ final class AwarenessEngine {
         let appChanged = snapshot.bundleIdentifier != lastDeliveredBundleIdentifier
         lastDeliveredBundleIdentifier = snapshot.bundleIdentifier
         let holdSpecialScene = [.debugging, .success].contains(lastScene)
-            && Date().timeIntervalSince(lastSceneChange) < 16
-            && !appChanged
+            && Date().timeIntervalSince(lastSceneChange) < 16 && !appChanged
         guard force || scene != lastScene else { return }
         guard force || !holdSpecialScene else { return }
-
         lastScene = scene
         lastSceneChange = Date()
         onSceneChange?(scene, snapshot)
     }
 
     private func externalFrontmostApplication() -> NSRunningApplication? {
-        let current = NSWorkspace.shared.frontmostApplication
+        let current = applicationProvider()
         if current?.bundleIdentifier != Bundle.main.bundleIdentifier {
             lastExternalApplication = current
         }
@@ -636,8 +718,7 @@ final class AwarenessEngine {
         guard identifier != lastBundleIdentifier else { return }
         lastBundleIdentifier = identifier
         activeSince = Date()
-        lastOCRText = ""
-        lastOCRDate = .distantPast
+        invalidateOCR()
     }
 
     private func baseSnapshot(usedOCR: Bool) -> AwarenessSnapshot {
@@ -647,13 +728,13 @@ final class AwarenessEngine {
             bundleIdentifier: application?.bundleIdentifier ?? "",
             windowTitle: "",
             usedOCR: usedOCR,
-            idleSeconds: secondsSinceLastInput(),
+            idleSeconds: idleTimeProvider(),
             activeDuration: Date().timeIntervalSince(activeSince),
             capturedAt: Date()
         )
     }
 
-    private func secondsSinceLastInput() -> TimeInterval {
+    static func inputIdleSeconds() -> TimeInterval {
         let eventTypes: [CGEventType] = [
             .keyDown, .leftMouseDown, .rightMouseDown, .mouseMoved,
             .leftMouseDragged, .rightMouseDragged, .scrollWheel
@@ -672,6 +753,10 @@ final class AwarenessEngine {
         processIdentifier: pid_t,
         completion: @escaping ((title: String, text: String)) -> Void
     ) {
+        if let recognitionOverride {
+            recognitionOverride(processIdentifier, completion)
+            return
+        }
         if #available(macOS 14.0, *) {
             recognizeFrontWindowWithScreenCaptureKit(
                 processIdentifier: processIdentifier,
@@ -685,12 +770,14 @@ final class AwarenessEngine {
                         .null,
                         .optionIncludingWindow,
                         window.id,
-                        [.bestResolution, .boundsIgnoreFraming]
+                        [.nominalResolution, .boundsIgnoreFraming]
                       ) else {
                     completion(("", ""))
                     return
                 }
-                completion(self.recognizeText(in: image, title: window.title))
+                autoreleasepool {
+                    completion(self.recognizeText(in: image, title: window.title))
+                }
             }
         }
     }
@@ -727,7 +814,7 @@ final class AwarenessEngine {
             let filter = SCContentFilter(desktopIndependentWindow: window)
             let configuration = SCStreamConfiguration()
             let longestSide = max(window.frame.width, window.frame.height)
-            let pixelScale = min(2.0, 1800.0 / max(1, longestSide))
+            let pixelScale = min(2.0, 1600.0 / max(1, longestSide))
             configuration.width = max(1, Int(window.frame.width * pixelScale))
             configuration.height = max(1, Int(window.frame.height * pixelScale))
             configuration.scalesToFit = true
@@ -743,12 +830,9 @@ final class AwarenessEngine {
                     return
                 }
                 self.scanQueue.async {
-                    completion(
-                        self.recognizeText(
-                            in: image,
-                            title: window.title ?? ""
-                        )
-                    )
+                    autoreleasepool {
+                        completion(self.recognizeText(in: image, title: window.title ?? ""))
+                    }
                 }
             }
         }

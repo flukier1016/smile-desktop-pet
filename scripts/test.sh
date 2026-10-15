@@ -5,11 +5,16 @@ PROJECT_DIR="${0:A:h:h}"
 BUILD_DIR="$PROJECT_DIR/.build"
 
 mkdir -p "$BUILD_DIR"
+case "$(uname -m)" in
+  arm64) target="arm64-apple-macos13.0" ;;
+  x86_64) target="x86_64-apple-macos13.0" ;;
+  *) echo "Unsupported architecture" >&2; exit 1 ;;
+esac
 
 xcrun --sdk macosx swiftc \
   -swift-version 5 \
   -parse-as-library \
-  -target arm64-apple-macos13.0 \
+  -target "$target" \
   "$PROJECT_DIR/Sources/Awareness.swift" \
   "$PROJECT_DIR/Tests/AwarenessClassifierTests.swift" \
   -framework AppKit \
@@ -22,12 +27,36 @@ xcrun --sdk macosx swiftc \
 xcrun --sdk macosx swiftc \
   -swift-version 5 \
   -parse-as-library \
-  -target arm64-apple-macos13.0 \
+  -target "$target" \
   "$PROJECT_DIR/Sources/CompanionProgress.swift" \
   "$PROJECT_DIR/Tests/CompanionProgressTests.swift" \
   -o "$BUILD_DIR/CompanionProgressTests"
 
 "$BUILD_DIR/CompanionProgressTests"
+
+xcrun --sdk macosx swiftc \
+  -swift-version 5 -parse-as-library -target "$target" \
+  "$PROJECT_DIR/Sources/Awareness.swift" \
+  "$PROJECT_DIR/Tests/OCRScanStateTests.swift" \
+  -framework AppKit -framework ScreenCaptureKit -framework Vision \
+  -o "$BUILD_DIR/OCRScanStateTests"
+"$BUILD_DIR/OCRScanStateTests"
+
+xcrun --sdk macosx swiftc \
+  -swift-version 5 -parse-as-library -target "$target" \
+  "$PROJECT_DIR/Sources/Awareness.swift" \
+  "$PROJECT_DIR/Tests/AwarenessLifecycleTests.swift" \
+  -framework AppKit -framework ScreenCaptureKit -framework Vision \
+  -o "$BUILD_DIR/AwarenessLifecycleTests"
+"$BUILD_DIR/AwarenessLifecycleTests"
+
+xcrun --sdk macosx swiftc \
+  -swift-version 5 -parse-as-library -D PET_TESTING -target "$target" \
+  "$PROJECT_DIR"/Sources/*.swift \
+  "$PROJECT_DIR/Tests/PetRenderingTests.swift" \
+  -framework AppKit -framework QuartzCore -framework ScreenCaptureKit -framework Vision \
+  -o "$BUILD_DIR/PetRenderingTests"
+"$BUILD_DIR/PetRenderingTests" "$PROJECT_DIR/Assets/pet.png"
 
 skin_fixture="$PROJECT_DIR/Tests/CodexSkinConfigFixture.toml"
 skin_test_dir=$(mktemp -d "${TMPDIR:-/tmp}/smile-skin-test.XXXXXX")

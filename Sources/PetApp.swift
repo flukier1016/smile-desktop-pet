@@ -3,7 +3,9 @@ import QuartzCore
 
 private let appName = "笑笑桌宠"
 
+#if !PET_TESTING
 @main
+#endif
 final class PetAppDelegate: NSObject, NSApplicationDelegate {
     private static var retainedDelegate: PetAppDelegate?
     private var controller: PetController?
@@ -25,6 +27,10 @@ final class PetAppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         false
     }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        controller?.stop()
+    }
 }
 
 final class PetPanel: NSPanel {
@@ -38,12 +44,14 @@ final class PetController: NSObject {
     private let maximumScale: CGFloat = 1.10
     private var petScale: CGFloat = {
         let saved = UserDefaults.standard.double(forKey: "petScale")
-        return saved > 0 ? CGFloat(saved) : 0.74
+        return saved.isFinite && saved > 0 ? CGFloat(min(1.10, max(0.55, saved))) : 0.74
     }()
     private var panel: PetPanel!
     private var petView: PetView!
     private var statusItem: NSStatusItem!
     private var idleTimer: Timer?
+    private var hideTimer: Timer?
+    private var quietTimer: Timer?
     private var quietUntil: Date?
     private var clickThrough = false
     private var awarenessEngine: AwarenessEngine!
@@ -62,17 +70,6 @@ final class PetController: NSObject {
         petView.showMessage("嗨！戳戳我，或者右键看看～", duration: 5)
         petView.celebrate(symbols: ["✨", "♥︎", "✨"], count: 10)
 
-        idleTimer = Timer.scheduledTimer(
-            timeInterval: 11,
-            target: self,
-            selector: #selector(idleMoment),
-            userInfo: nil,
-            repeats: true
-        )
-        if let idleTimer {
-            RunLoop.main.add(idleTimer, forMode: .common)
-        }
-
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(screenLayoutChanged),
@@ -82,6 +79,26 @@ final class PetController: NSObject {
 
         awarenessEngine.start()
         showFirstRunCompanionWelcomeIfNeeded()
+    }
+
+    func stop() {
+        idleTimer?.invalidate()
+        hideTimer?.invalidate()
+        quietTimer?.invalidate()
+        awarenessEngine.stop()
+        NotificationCenter.default.removeObserver(self)
+    }
+
+    private func updateBackgroundActivity(_ active: Bool) {
+        awarenessEngine.setSuspended(!active)
+        idleTimer?.invalidate()
+        idleTimer = nil
+        guard active, quietUntil == nil else { return }
+        idleTimer = Timer(timeInterval: 11, repeats: true) { [weak self] _ in
+            self?.idleMoment()
+        }
+        idleTimer?.tolerance = 1
+        if let idleTimer { RunLoop.main.add(idleTimer, forMode: .common) }
     }
 
     private func makePanel() {
@@ -433,9 +450,13 @@ final class PetController: NSObject {
     }
 
     private func configureAwareness() {
+        petView.onActivityChange = { [weak self] active in
+            self?.updateBackgroundActivity(active)
+        }
         awarenessEngine.onSnapshot = { [weak self] snapshot, _ in
-            self?.lastAwarenessSnapshot = snapshot
-            self?.updateMenuStates()
+            guard let self else { return }
+            self.lastAwarenessSnapshot = snapshot
+            self.updateMenuStates()
         }
         awarenessEngine.onSceneChange = { [weak self] scene, snapshot in
             self?.applyScene(scene, snapshot: snapshot)
@@ -840,13 +861,17 @@ final class PetController: NSObject {
     }
 
     @objc func hideForFiveMinutes() {
+        hideTimer?.invalidate()
         panel.orderOut(nil)
-        Timer.scheduledTimer(withTimeInterval: 300, repeats: false) { [weak self] _ in
+        petView.refreshActivity()
+        hideTimer = Timer.scheduledTimer(withTimeInterval: 300, repeats: false) { [weak self] _ in
             self?.bringBack()
         }
     }
 
     @objc func bringBack() {
+        hideTimer?.invalidate()
+        hideTimer = nil
         let mouseLocation = NSEvent.mouseLocation
         let targetScreen = NSScreen.screens.first(where: {
             NSMouseInRect(mouseLocation, $0.frame, false)
@@ -861,6 +886,7 @@ final class PetController: NSObject {
             constrainToVisibleScreen()
         }
         panel.orderFrontRegardless()
+        petView.refreshActivity()
         petView.showMessage("我回来啦！", duration: 3)
         petView.bounce()
     }
@@ -884,6 +910,8 @@ final class PetController: NSObject {
     }
 
     @objc private func toggleQuiet(_ sender: NSMenuItem) {
+        quietTimer?.invalidate()
+        quietTimer = nil
         if let quietUntil, quietUntil > Date() {
             self.quietUntil = nil
             panel.orderFrontRegardless()
@@ -891,7 +919,16 @@ final class PetController: NSObject {
         } else {
             quietUntil = Date().addingTimeInterval(600)
             petView.showMessage("安静模式开启，十分钟后见～", duration: 4)
+            quietTimer = Timer.scheduledTimer(withTimeInterval: 600, repeats: false) { [weak self] _ in
+                guard let self else { return }
+                self.quietUntil = nil
+                self.petView.isQuiet = false
+                self.updateBackgroundActivity(self.petView.isActive)
+                self.updateMenuStates()
+            }
         }
+        petView.isQuiet = quietUntil != nil
+        updateBackgroundActivity(petView.isActive)
         updateMenuStates()
     }
 
@@ -916,7 +953,9 @@ final class PetController: NSObject {
         findMenuItem(tag: 312, in: menu)?.state = abs(awarenessEngine.ocrInterval - 15) < 0.5 ? .on : .off
         findMenuItem(tag: 313, in: menu)?.state = abs(awarenessEngine.ocrInterval - 30) < 0.5 ? .on : .off
         findMenuItem(tag: 401, in: menu)?.title = companionMenuTitle()
-        controlCenter?.update(makeControlCenterState())
+        if controlCenter?.isVisible == true {
+            controlCenter?.update(makeControlCenterState())
+        }
     }
 
     private func findMenuItem(tag: Int, in menu: NSMenu) -> NSMenuItem? {
@@ -975,540 +1014,5 @@ final class PetController: NSObject {
     private func playSound(named name: String) {
         let path = "/System/Library/Sounds/\(name).aiff"
         NSSound(contentsOfFile: path, byReference: true)?.play()
-    }
-}
-
-private struct PetParticle {
-    let symbol: String
-    var position: NSPoint
-    var velocity: CGVector
-    let bornAt: TimeInterval
-    let lifetime: TimeInterval
-    let size: CGFloat
-}
-
-final class PetView: NSView {
-    weak var controller: PetController?
-    var walking = false
-
-    private let image: NSImage
-    private let logicalSize = NSSize(width: 320, height: 430)
-    private var animationTimer: Timer?
-    private var particles: [PetParticle] = []
-    private var message: String?
-    private var messageEndsAt: TimeInterval = 0
-    private var scene: PetScene = .companion
-    private var phase: CGFloat = 0
-    private var lastTick = ProcessInfo.processInfo.systemUptime
-    private var bounceStartedAt: TimeInterval?
-    private var spinStartedAt: TimeInterval?
-    private var wiggleEndsAt: TimeInterval = 0
-    private var patEndsAt: TimeInterval = 0
-    private var dragStartMouse = NSPoint.zero
-    private var dragStartWindow = NSPoint.zero
-    private var dragged = false
-
-    init(frame frameRect: NSRect, image: NSImage) {
-        self.image = image
-        super.init(frame: frameRect)
-        wantsLayer = true
-        layer?.backgroundColor = NSColor.clear.cgColor
-        setAccessibilityElement(true)
-        setAccessibilityRole(.button)
-        setAccessibilityLabel("笑笑桌宠")
-        setAccessibilityValue(scene.title)
-        setAccessibilityHelp(
-            "按下可摸摸，双击可庆祝，拖动可换位置，右键打开互动菜单"
-        )
-        setAccessibilityIdentifier("smile-desktop-pet")
-
-        animationTimer = Timer(
-            timeInterval: 1.0 / 30.0,
-            target: self,
-            selector: #selector(tick),
-            userInfo: nil,
-            repeats: true
-        )
-        if let animationTimer {
-            RunLoop.main.add(animationTimer, forMode: .common)
-        }
-    }
-
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-
-    deinit {
-        animationTimer?.invalidate()
-    }
-
-    override var acceptsFirstResponder: Bool { true }
-
-    override func draw(_ dirtyRect: NSRect) {
-        super.draw(dirtyRect)
-        guard displayScale > 0 else { return }
-        let context = NSGraphicsContext.current?.cgContext
-        context?.saveGState()
-        context?.scaleBy(x: displayScale, y: displayScale)
-        drawSceneBackdrop()
-        drawPet()
-        drawSceneDecorations()
-        drawParticles()
-        drawSceneBadge()
-        drawBubble()
-        context?.restoreGState()
-    }
-
-    private func petRect() -> NSRect {
-        let area = NSRect(x: 18, y: 8, width: logicalSize.width - 36, height: 352)
-        let aspect = image.size.width / image.size.height
-        let width = min(area.width, area.height * aspect)
-        let height = width / aspect
-        return NSRect(
-            x: area.midX - width / 2,
-            y: area.minY,
-            width: width,
-            height: height
-        )
-    }
-
-    private func drawPet() {
-        let now = ProcessInfo.processInfo.systemUptime
-        var rect = petRect()
-        var verticalOffset: CGFloat
-        var rotation: CGFloat = 0
-        var scale: CGFloat = 1
-
-        switch scene.motion {
-        case .calm:
-            verticalOffset = sin(phase) * 3
-        case .focus:
-            verticalOffset = sin(phase * 0.62) * 1.4
-            scale -= 0.008
-        case .busy:
-            verticalOffset = abs(sin(phase * 1.7)) * 2.2
-            rotation += sin(phase * 1.7) * 0.8
-        case .panic:
-            verticalOffset = abs(sin(phase * 4.5)) * 4
-            rotation += sin(phase * 6.5) * 2.8
-        case .dance:
-            verticalOffset = abs(sin(phase * 2.8)) * 8
-            rotation += sin(phase * 2.8) * 4.5
-        case .sleepy:
-            verticalOffset = sin(phase * 0.35) * 1.2
-            rotation -= 1.2
-            scale -= 0.015
-        case .celebrate:
-            verticalOffset = abs(sin(phase * 3.2)) * 7
-            rotation += sin(phase * 3.2) * 3
-        }
-
-        if walking {
-            verticalOffset += abs(sin(phase * 4)) * 9
-            rotation += sin(phase * 4) * 4
-        }
-
-        if let start = bounceStartedAt {
-            let progress = (now - start) / 0.85
-            if progress < 1 {
-                verticalOffset += CGFloat(abs(sin(progress * .pi * 3))) * 34 * CGFloat(1 - progress)
-                scale += CGFloat(sin(progress * .pi)) * 0.06
-            }
-        }
-
-        if let start = spinStartedAt {
-            let progress = min(1, (now - start) / 0.9)
-            let eased = 1 - pow(1 - progress, 3)
-            rotation += CGFloat(eased * 360)
-            scale += CGFloat(sin(progress * .pi)) * 0.12
-        }
-
-        if now < wiggleEndsAt {
-            rotation += sin(CGFloat(now * 28)) * 7
-        }
-
-        if now < patEndsAt {
-            scale += 0.035 + sin(CGFloat(now * 24)) * 0.018
-            rect.size.height *= 0.97
-        }
-
-        if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
-            verticalOffset = 0
-            rotation = 0
-            scale = 1
-        }
-
-        rect.origin.y += verticalOffset
-        let context = NSGraphicsContext.current?.cgContext
-        context?.saveGState()
-        context?.translateBy(x: rect.midX, y: rect.midY)
-        context?.rotate(by: rotation * .pi / 180)
-        context?.scaleBy(x: scale, y: scale)
-        context?.translateBy(x: -rect.midX, y: -rect.midY)
-        image.draw(
-            in: rect,
-            from: .zero,
-            operation: .sourceOver,
-            fraction: 1,
-            respectFlipped: true,
-            hints: [.interpolation: NSImageInterpolation.high]
-        )
-        context?.restoreGState()
-    }
-
-    private func drawSceneBackdrop() {
-        let glowRect = NSRect(x: 43, y: 12, width: 234, height: 52)
-        let glow = NSBezierPath(ovalIn: glowRect)
-        scene.accentColor.withAlphaComponent(0.16).setFill()
-        glow.fill()
-
-        let innerRect = glowRect.insetBy(dx: 28, dy: 10)
-        scene.accentColor.withAlphaComponent(0.12).setFill()
-        NSBezierPath(ovalIn: innerRect).fill()
-    }
-
-    private func drawSceneDecorations() {
-        let symbols = scene.ambientSymbols
-        let positions = [
-            NSPoint(x: 38, y: 246),
-            NSPoint(x: 268, y: 225),
-            NSPoint(x: 49, y: 116)
-        ]
-
-        for index in 0..<min(symbols.count, positions.count) {
-            let floatOffset = sin(phase * 1.2 + CGFloat(index) * 1.8) * 7
-            let attributes: [NSAttributedString.Key: Any] = [
-                .font: NSFont.systemFont(
-                    ofSize: symbols[index].count > 2 ? 13 : 19,
-                    weight: .bold
-                ),
-                .foregroundColor: scene.accentColor.withAlphaComponent(0.82)
-            ]
-            let value = symbols[index] as NSString
-            let size = value.size(withAttributes: attributes)
-            value.draw(
-                at: NSPoint(
-                    x: positions[index].x - size.width / 2,
-                    y: positions[index].y + floatOffset
-                ),
-                withAttributes: attributes
-            )
-        }
-
-        if scene == .jailWork {
-            drawJailBars()
-        } else if scene == .meeting {
-            drawCornerProp("🔇")
-        } else if scene == .reading {
-            drawCornerProp("📖")
-        } else if scene == .coding {
-            drawCornerProp("⌨️")
-        } else if scene == .finance {
-            drawCornerProp("📈")
-        } else if scene == .music {
-            drawCornerProp("🎧")
-        }
-    }
-
-    private func drawJailBars() {
-        let barColor = NSColor(calibratedWhite: 0.19, alpha: 0.19)
-        barColor.setStroke()
-        for x in stride(from: CGFloat(58), through: CGFloat(262), by: 34) {
-            let bar = NSBezierPath()
-            bar.lineWidth = 5
-            bar.lineCapStyle = .round
-            bar.move(to: NSPoint(x: x, y: 55))
-            bar.line(to: NSPoint(x: x, y: 315))
-            bar.stroke()
-        }
-        for y in [CGFloat(88), CGFloat(289)] {
-            let rail = NSBezierPath()
-            rail.lineWidth = 7
-            rail.move(to: NSPoint(x: 48, y: y))
-            rail.line(to: NSPoint(x: 272, y: y))
-            rail.stroke()
-        }
-    }
-
-    private func drawCornerProp(_ prop: String) {
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.systemFont(ofSize: 28),
-            .foregroundColor: NSColor.white
-        ]
-        (prop as NSString).draw(
-            at: NSPoint(x: 236, y: 73 + sin(phase * 1.4) * 3),
-            withAttributes: attributes
-        )
-    }
-
-    private func drawSceneBadge() {
-        guard message == nil else { return }
-        let badgeRect = NSRect(x: 69, y: 376, width: 182, height: 32)
-        let badge = NSBezierPath(roundedRect: badgeRect, xRadius: 16, yRadius: 16)
-        NSGraphicsContext.current?.saveGraphicsState()
-        let shadow = NSShadow()
-        shadow.shadowColor = NSColor.black.withAlphaComponent(0.18)
-        shadow.shadowBlurRadius = 7
-        shadow.shadowOffset = NSSize(width: 0, height: -2)
-        shadow.set()
-
-        let highlight = scene.accentColor.blended(
-            withFraction: 0.22,
-            of: .white
-        ) ?? scene.accentColor
-        NSGradient(
-            starting: highlight.withAlphaComponent(0.97),
-            ending: scene.accentColor.withAlphaComponent(0.97)
-        )?.draw(in: badge, angle: 0)
-        NSColor.white.withAlphaComponent(0.32).setStroke()
-        badge.lineWidth = 1
-        badge.stroke()
-        NSGraphicsContext.current?.restoreGraphicsState()
-
-        NSGraphicsContext.current?.saveGraphicsState()
-        let paragraph = NSMutableParagraphStyle()
-        paragraph.alignment = .center
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.systemFont(ofSize: 14, weight: .bold),
-            .foregroundColor: NSColor.white,
-            .paragraphStyle: paragraph
-        ]
-        ("\(scene.emoji) \(scene.title)" as NSString).draw(
-            with: badgeRect.insetBy(dx: 8, dy: 7),
-            options: [.usesLineFragmentOrigin],
-            attributes: attributes
-        )
-        NSGraphicsContext.current?.restoreGraphicsState()
-    }
-
-    private func drawBubble() {
-        guard let message else { return }
-        let bubbleRect = NSRect(x: 8, y: 350, width: logicalSize.width - 16, height: 70)
-        let bubble = NSBezierPath(roundedRect: bubbleRect, xRadius: 20, yRadius: 20)
-        NSGraphicsContext.current?.saveGraphicsState()
-        let shadow = NSShadow()
-        shadow.shadowColor = NSColor.black.withAlphaComponent(0.18)
-        shadow.shadowBlurRadius = 10
-        shadow.shadowOffset = NSSize(width: 0, height: -2)
-        shadow.set()
-
-        NSGradient(
-            starting: NSColor.white.withAlphaComponent(0.98),
-            ending: NSColor(calibratedRed: 1.0, green: 0.965, blue: 0.93, alpha: 0.98)
-        )?.draw(in: bubble, angle: -90)
-        scene.accentColor.withAlphaComponent(0.24).setStroke()
-        bubble.lineWidth = 1.2
-        bubble.stroke()
-
-        let tail = NSBezierPath()
-        tail.move(to: NSPoint(x: bubbleRect.midX - 10, y: bubbleRect.minY + 1))
-        tail.line(to: NSPoint(x: bubbleRect.midX + 12, y: bubbleRect.minY + 1))
-        tail.line(to: NSPoint(x: bubbleRect.midX + 2, y: bubbleRect.minY - 13))
-        tail.close()
-        NSColor(calibratedRed: 1.0, green: 0.965, blue: 0.93, alpha: 0.98).setFill()
-        tail.fill()
-        NSGraphicsContext.current?.restoreGraphicsState()
-
-        let iconRect = NSRect(x: bubbleRect.minX + 14, y: bubbleRect.midY - 18, width: 36, height: 36)
-        scene.accentColor.withAlphaComponent(0.12).setFill()
-        NSBezierPath(roundedRect: iconRect, xRadius: 12, yRadius: 12).fill()
-        let iconParagraph = NSMutableParagraphStyle()
-        iconParagraph.alignment = .center
-        let iconAttributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.systemFont(ofSize: 18),
-            .paragraphStyle: iconParagraph
-        ]
-        (scene.emoji as NSString).draw(
-            with: iconRect.insetBy(dx: 2, dy: 7),
-            options: [.usesLineFragmentOrigin],
-            attributes: iconAttributes
-        )
-
-        NSGraphicsContext.current?.saveGraphicsState()
-        let paragraph = NSMutableParagraphStyle()
-        paragraph.alignment = .center
-        paragraph.lineBreakMode = .byWordWrapping
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.systemFont(ofSize: 16, weight: .semibold),
-            .foregroundColor: NSColor(calibratedRed: 0.20, green: 0.14, blue: 0.13, alpha: 1),
-            .paragraphStyle: paragraph
-        ]
-        let textRect = NSRect(
-            x: iconRect.maxX + 10,
-            y: bubbleRect.minY + 11,
-            width: bubbleRect.maxX - iconRect.maxX - 22,
-            height: bubbleRect.height - 22
-        )
-        (message as NSString).draw(
-            with: textRect,
-            options: [.usesLineFragmentOrigin, .usesFontLeading],
-            attributes: attributes
-        )
-        NSGraphicsContext.current?.restoreGraphicsState()
-    }
-
-    private func drawParticles() {
-        let now = ProcessInfo.processInfo.systemUptime
-        for particle in particles {
-            let age = now - particle.bornAt
-            let opacity = max(0, 1 - age / particle.lifetime)
-            let attributes: [NSAttributedString.Key: Any] = [
-                .font: NSFont.systemFont(ofSize: particle.size),
-                .foregroundColor: NSColor.white.withAlphaComponent(opacity)
-            ]
-            (particle.symbol as NSString).draw(
-                at: particle.position,
-                withAttributes: attributes
-            )
-        }
-    }
-
-    @objc private func tick() {
-        let now = ProcessInfo.processInfo.systemUptime
-        let delta = min(0.05, now - lastTick)
-        lastTick = now
-        phase += CGFloat(delta) * 2.4
-
-        for index in particles.indices {
-            particles[index].position.x += particles[index].velocity.dx * CGFloat(delta)
-            particles[index].position.y += particles[index].velocity.dy * CGFloat(delta)
-            particles[index].velocity.dy -= 24 * CGFloat(delta)
-        }
-        particles.removeAll { now - $0.bornAt > $0.lifetime }
-
-        if message != nil && now >= messageEndsAt {
-            message = nil
-        }
-        if let start = bounceStartedAt, now - start >= 0.85 {
-            bounceStartedAt = nil
-        }
-        if let start = spinStartedAt, now - start >= 0.9 {
-            spinStartedAt = nil
-        }
-        needsDisplay = true
-    }
-
-    func showMessage(_ text: String, duration: TimeInterval) {
-        message = text
-        messageEndsAt = ProcessInfo.processInfo.systemUptime + duration
-        needsDisplay = true
-    }
-
-    func setScene(_ newScene: PetScene) {
-        scene = newScene
-        setAccessibilityValue(newScene.title)
-        needsDisplay = true
-    }
-
-    func bounce() {
-        bounceStartedAt = ProcessInfo.processInfo.systemUptime
-    }
-
-    func wiggle() {
-        wiggleEndsAt = ProcessInfo.processInfo.systemUptime + 0.9
-    }
-
-    func patReaction() {
-        patEndsAt = ProcessInfo.processInfo.systemUptime + 0.75
-        celebrate(symbols: ["♥︎", "♥︎", "✨"], count: 8, origin: NSPoint(x: logicalSize.width / 2, y: 275))
-    }
-
-    func party() {
-        spinStartedAt = ProcessInfo.processInfo.systemUptime
-        celebrate(symbols: ["♥︎", "✨", "✦", "●"], count: 28)
-    }
-
-    func feed(with food: String) {
-        celebrate(symbols: [food, "♥︎", "✨"], count: 12, origin: NSPoint(x: logicalSize.width / 2, y: 205))
-        bounce()
-    }
-
-    func celebrate(
-        symbols: [String],
-        count: Int,
-        origin: NSPoint? = nil
-    ) {
-        guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
-            return
-        }
-        let now = ProcessInfo.processInfo.systemUptime
-        let center = origin ?? NSPoint(x: logicalSize.width / 2, y: 225)
-        for _ in 0..<count {
-            particles.append(
-                PetParticle(
-                    symbol: symbols.randomElement()!,
-                    position: NSPoint(
-                        x: center.x + CGFloat.random(in: -35...35),
-                        y: center.y + CGFloat.random(in: -20...35)
-                    ),
-                    velocity: CGVector(
-                        dx: CGFloat.random(in: -75...75),
-                        dy: CGFloat.random(in: 60...150)
-                    ),
-                    bornAt: now,
-                    lifetime: Double.random(in: 1.0...1.8),
-                    size: CGFloat.random(in: 14...24)
-                )
-            )
-        }
-    }
-
-    override func mouseDown(with event: NSEvent) {
-        if event.clickCount >= 2 {
-            controller?.doubleTapped()
-            return
-        }
-        dragStartMouse = NSEvent.mouseLocation
-        dragStartWindow = window?.frame.origin ?? .zero
-        dragged = false
-    }
-
-    override func mouseDragged(with event: NSEvent) {
-        guard let window else { return }
-        let current = NSEvent.mouseLocation
-        let deltaX = current.x - dragStartMouse.x
-        let deltaY = current.y - dragStartMouse.y
-        if hypot(deltaX, deltaY) > 3 {
-            dragged = true
-        }
-        window.setFrameOrigin(
-            NSPoint(x: dragStartWindow.x + deltaX, y: dragStartWindow.y + deltaY)
-        )
-    }
-
-    override func mouseUp(with event: NSEvent) {
-        if dragged {
-            controller?.savePosition()
-        } else if event.clickCount < 2 {
-            let actualPoint = convert(event.locationInWindow, from: nil)
-            controller?.tapped(
-                at: NSPoint(
-                    x: actualPoint.x / displayScale,
-                    y: actualPoint.y / displayScale
-                )
-            )
-        }
-    }
-
-    override func scrollWheel(with event: NSEvent) {
-        if event.modifierFlags.contains(.option) {
-            controller?.adjustScale(by: event.scrollingDeltaY)
-        } else {
-            super.scrollWheel(with: event)
-        }
-    }
-
-    override func rightMouseDown(with event: NSEvent) {
-        guard let menu = controller?.contextualMenu() else { return }
-        NSMenu.popUpContextMenu(menu, with: event, for: self)
-    }
-
-    override func accessibilityPerformPress() -> Bool {
-        controller?.pat()
-        return true
-    }
-
-    private var displayScale: CGFloat {
-        min(bounds.width / logicalSize.width, bounds.height / logicalSize.height)
     }
 }
