@@ -1,6 +1,6 @@
 # Contributing
 
-感谢你愿意让笑笑更好玩。小修复、场景规则、台词、辅助功能和文档改进都欢迎。
+感谢你愿意让肉鱼更好玩。小修复、场景规则、台词、辅助功能和文档改进都欢迎。
 
 ## 开始之前
 
@@ -18,7 +18,7 @@ xcode-select --install
 ./scripts/security-check.sh
 ./scripts/test.sh
 ./build.sh
-open "笑笑桌宠.app"
+open "肉鱼桌宠.app"
 ```
 
 源码没有第三方运行时依赖。构建会生成 Apple Silicon 与 Intel 通用 App，并
@@ -39,7 +39,7 @@ PR 合并前应通过：
 ./scripts/security-check.sh
 ./scripts/test.sh
 ./build.sh
-codesign --verify --deep --strict "笑笑桌宠.app"
+codesign --verify --deep --strict "肉鱼桌宠.app"
 ```
 
 ## 代码与文字风格

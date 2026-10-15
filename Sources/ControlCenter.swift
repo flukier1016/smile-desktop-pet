@@ -227,7 +227,7 @@ final class ControlCenterController: NSObject {
             backing: .buffered,
             defer: false
         )
-        panel.title = "笑笑桌宠控制中心"
+        panel.title = "肉鱼桌宠控制中心"
         panel.titleVisibility = .hidden
         panel.titlebarAppearsTransparent = true
         panel.isMovableByWindowBackground = true
@@ -236,7 +236,7 @@ final class ControlCenterController: NSObject {
         panel.level = .floating
         panel.collectionBehavior = [.moveToActiveSpace, .fullScreenAuxiliary]
         panel.backgroundColor = .clear
-        panel.setAccessibilityLabel("笑笑桌宠控制中心")
+        panel.setAccessibilityLabel("肉鱼桌宠控制中心")
 
         let background = NSVisualEffectView()
         background.material = .sidebar
@@ -302,13 +302,13 @@ final class ControlCenterController: NSObject {
         let icon = NSImageView(image: NSApp.applicationIconImage)
         icon.imageScaling = .scaleProportionallyUpOrDown
         icon.translatesAutoresizingMaskIntoConstraints = false
-        icon.setAccessibilityLabel("笑笑桌宠图标")
+        icon.setAccessibilityLabel("肉鱼桌宠图标")
         NSLayoutConstraint.activate([
             icon.widthAnchor.constraint(equalToConstant: 54),
             icon.heightAnchor.constraint(equalToConstant: 54)
         ])
 
-        let title = NSTextField(labelWithString: "笑笑桌宠")
+        let title = NSTextField(labelWithString: "肉鱼桌宠")
         title.font = NSFont.systemFont(ofSize: 24, weight: .bold)
         let version = Bundle.main.object(
             forInfoDictionaryKey: "CFBundleShortVersionString"
@@ -515,7 +515,7 @@ final class ControlCenterController: NSObject {
         let button = NSButton(title: title, target: self, action: action)
         button.bezelStyle = .rounded
         button.font = NSFont.systemFont(ofSize: 13, weight: .semibold)
-        button.toolTip = "立即与笑笑互动"
+        button.toolTip = "立即与肉鱼互动"
         button.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
             button.widthAnchor.constraint(equalToConstant: 199),

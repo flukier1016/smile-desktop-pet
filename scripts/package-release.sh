@@ -3,7 +3,7 @@ set -euo pipefail
 
 PROJECT_DIR="${0:A:h:h}"
 VERSION="${1:-1.4.1}"
-APP_NAME="笑笑桌宠"
+APP_NAME="肉鱼桌宠"
 DIST_DIR="$PROJECT_DIR/dist"
 STAGE_DIR="$DIST_DIR/$APP_NAME-v$VERSION"
 ZIP_PATH="$DIST_DIR/SmilePet-v$VERSION-macos-universal.zip"

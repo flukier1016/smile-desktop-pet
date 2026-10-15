@@ -1,10 +1,10 @@
 <div align="center">
 
-<img src="docs/media/hero.png" alt="笑笑桌宠产品横幅" width="100%">
+<img src="docs/media/hero.png" alt="肉鱼桌宠产品横幅" width="100%">
 
-<img src="docs/media/app-icon.png" alt="笑笑桌宠人物版应用图标" width="112">
+<img src="docs/media/app-icon.png" alt="肉鱼桌宠人物版应用图标" width="112">
 
-# 笑笑桌宠
+# 肉鱼桌宠
 
 **会看场景、会接话、还能被你慢慢养熟的原生 macOS 桌面搭子。**
 
@@ -21,7 +21,7 @@
 
 ## 一眼看懂
 
-笑笑常驻桌面，不占 Dock。她会根据前台 App 和可选的本地 OCR，在写代码、
+肉鱼常驻桌面，不占 Dock。她会根据前台 App 和可选的本地 OCR，在写代码、
 报错、测试通过、表格、盯盘、会议、阅读、摸鱼、深夜加班等 **23 种状态**
 间自动切换。每天摸摸、喂食、夸夸和抽签，还会积累经验、连续陪伴天数，
 从“初见搭子”一路成长为“灵魂工友”。所有判断和成长记录都只在本机完成。
@@ -36,7 +36,7 @@
 - **可访问**：支持键盘焦点、VoiceOver 语义和系统“减少动态效果”。
 
 <p align="center">
-  <img src="docs/media/control-center.png" width="680" alt="笑笑桌宠原生控制中心">
+  <img src="docs/media/control-center.png" width="680" alt="肉鱼桌宠原生控制中心">
 </p>
 
 ## 每天一小圈
@@ -57,7 +57,7 @@
 
 1. 打开 [Releases](../../releases/latest)，下载
    `SmilePet-v1.4.1-macos-universal.dmg`。
-2. 把“笑笑桌宠”拖到“应用程序”。
+2. 把“肉鱼桌宠”拖到“应用程序”。
 3. 第一次启动时，在 Finder 右键 App，选择“打开”并确认。
 4. 在首次出现的控制中心完成一项互动，或点击菜单栏笑脸随时再次打开。
 
@@ -89,9 +89,9 @@ OCR 默认关闭，只有用户主动开启后才请求屏幕录制权限。随�
 或在系统设置中撤销权限。详见 [PRIVACY.md](PRIVACY.md) 与
 [SECURITY.md](SECURITY.md)。
 
-## Codex 笑笑皮肤
+## Codex 肉鱼皮肤
 
-仓库附带一整套 Codex 原生皮肤：88 帧笑笑桌宠、暖白／墨棕界面、漆红强调色，
+仓库附带一整套 Codex 原生皮肤：88 帧肉鱼桌宠、暖白／墨棕界面、漆红强调色，
 以及匹配的 Rosé Pine 代码主题。它使用 Codex 官方自定义桌宠与主题配置，
 不修改官方 App 包和签名。桌宠 App 与 Codex 皮肤彼此独立，可以任选其一。
 
@@ -111,7 +111,7 @@ cd smile-desktop-pet
 ./scripts/security-check.sh
 ./scripts/test.sh
 ./build.sh
-open "笑笑桌宠.app"
+open "肉鱼桌宠.app"
 ```
 
 生成的是 macOS 13+、Apple Silicon＋Intel 通用、临时签名的原生 App。

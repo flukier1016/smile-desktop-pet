@@ -1,6 +1,6 @@
 # SmilePet Landing Page
 
-笑笑桌宠的官方产品页，使用 React、TypeScript、Vite 和 Tailwind CSS 构建。
+肉鱼桌宠的官方产品页，使用 React、TypeScript、Vite 和 Tailwind CSS 构建。
 
 ## 本地开发
 

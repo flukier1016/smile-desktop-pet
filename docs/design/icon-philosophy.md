@@ -10,7 +10,7 @@ warm cream softens it into companionship; ink brown adds just enough structure t
 avoid sweetness without weight. Highlights should feel like enamel catching real
 light, calibrated with master-level restraint rather than decorative gloss.
 
-The central figure is unmistakably Xiaoxiao: a smiling face, short ink-black hair,
+The central figure is unmistakably Rouyu: a smiling face, short ink-black hair,
 warm cream coat, and paired white flower tassels. The crop stays close so expression
 arrives before detail, while the character accessories preserve her identity at
 small sizes. No wordmark competes with the face; the person is the mark.

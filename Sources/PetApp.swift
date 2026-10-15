@@ -1,7 +1,7 @@
 import AppKit
 import QuartzCore
 
-private let appName = "笑笑桌宠"
+private let appName = "肉鱼桌宠"
 
 @main
 final class PetAppDelegate: NSObject, NSApplicationDelegate {
@@ -165,7 +165,7 @@ final class PetController: NSObject {
         menu.addItem(quietItem)
 
         menu.addItem(.separator())
-        addMenuItem("退出笑笑桌宠", action: #selector(quit), to: menu)
+        addMenuItem("退出肉鱼桌宠", action: #selector(quit), to: menu)
         statusItem.menu = menu
     }
 
@@ -671,7 +671,7 @@ final class PetController: NSObject {
         alert.informativeText = """
         默认模式只读取当前前台 App 的名称，不需要屏幕权限。
 
-        开启“本地屏幕 OCR”后，笑笑桌宠只截取当前前台窗口，在本机内存中识别文字；不保存截图、不写入识别文字、不联网、不上传。
+        开启“本地屏幕 OCR”后，肉鱼桌宠只截取当前前台窗口，在本机内存中识别文字；不保存截图、不写入识别文字、不联网、不上传。
 
         你可以随时从菜单关闭 OCR，或在系统设置中撤销屏幕录制权限。
         """
@@ -689,7 +689,7 @@ final class PetController: NSObject {
         alert.informativeText = """
         本地 OCR 需要 macOS 的“屏幕与系统音频录制”权限。识别只在本机完成，不保存或上传画面。
 
-        授权后若没有立即生效，请退出并重新打开笑笑桌宠。
+        授权后若没有立即生效，请退出并重新打开肉鱼桌宠。
         """
         alert.addButton(withTitle: "打开系统设置")
         alert.addButton(withTitle: "暂不开启")
@@ -1015,7 +1015,7 @@ final class PetView: NSView {
         layer?.backgroundColor = NSColor.clear.cgColor
         setAccessibilityElement(true)
         setAccessibilityRole(.button)
-        setAccessibilityLabel("笑笑桌宠")
+        setAccessibilityLabel("肉鱼桌宠")
         setAccessibilityValue(scene.title)
         setAccessibilityHelp(
             "按下可摸摸，双击可庆祝，拖动可换位置，右键打开互动菜单"
